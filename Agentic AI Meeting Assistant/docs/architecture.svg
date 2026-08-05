@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160" role="img" aria-labelledby="title desc">
+  <title id="title">Agentic AI Meeting Assistant architecture</title>
+  <desc id="desc">A safety-first flow from private GCP media or a transcript through Groq transcription, LangGraph extraction, classification, human review, InsForge records, and safe GitHub dispatch.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eff6ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity=".13"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 17px Arial, sans-serif; fill: #475569; }
+      .box-title { font: 700 19px Arial, sans-serif; fill: #0f172a; }
+      .box-text { font: 400 15px Arial, sans-serif; fill: #334155; }
+      .small { font: 600 13px Arial, sans-serif; fill: #475569; letter-spacing: .8px; }
+      .label { font: 600 13px Arial, sans-serif; fill: #334155; }
+      .arrow { fill: none; stroke: #64748b; stroke-width: 3; marker-end: url(#arrow); }
+      .blue-arrow { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrowBlue); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1160" fill="url(#background)"/>
+  <text x="800" y="58" text-anchor="middle" class="title">Agentic AI Meeting Assistant</text>
+  <text x="800" y="87" text-anchor="middle" class="subtitle">AI suggests work. Evidence and human review decide what becomes accountable.</text>
+
+  <!-- Stage labels -->
+  <text x="120" y="142" class="small">1 · INPUT</text>
+  <text x="415" y="142" class="small">2 · AGENTIC ANALYSIS</text>
+  <text x="835" y="142" class="small">3 · DURABLE REVIEW</text>
+  <text x="1260" y="142" class="small">4 · SAFE OUTCOMES</text>
+
+  <!-- Input -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="170" width="230" height="138" rx="20" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+  </g>
+  <text x="185" y="218" text-anchor="middle" class="box-title">Meeting Media / Text</text>
+  <text x="185" y="248" text-anchor="middle" class="box-text">private GCS audio/video upload</text>
+  <text x="185" y="272" text-anchor="middle" class="box-text">or transcript + meeting date</text>
+
+  <!-- Agent -->
+  <g filter="url(#shadow)">
+    <rect x="365" y="170" width="330" height="138" rx="20" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  </g>
+  <text x="530" y="212" text-anchor="middle" class="box-title">Groq + LangGraph Agent</text>
+  <text x="530" y="242" text-anchor="middle" class="box-text">Groq transcribes with timestamps</text>
+  <text x="530" y="266" text-anchor="middle" class="box-text">then extracts speaker, quote, owner and date</text>
+  <text x="530" y="290" text-anchor="middle" class="box-text">never invents an accepted owner</text>
+
+  <!-- Classification -->
+  <g filter="url(#shadow)">
+    <rect x="360" y="390" width="340" height="338" rx="22" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  </g>
+  <text x="530" y="429" text-anchor="middle" class="box-title">Statement Classification</text>
+  <rect x="385" y="455" width="290" height="64" rx="13" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="530" y="482" text-anchor="middle" class="box-title">EXPLICIT COMMITMENT</text>
+  <text x="530" y="505" text-anchor="middle" class="box-text">“I will do X”</text>
+  <rect x="385" y="535" width="290" height="64" rx="13" fill="#fef3c7" stroke="#d97706"/>
+  <text x="530" y="562" text-anchor="middle" class="box-title">NEEDS CONFIRMATION</text>
+  <text x="530" y="585" text-anchor="middle" class="box-text">request, unclear or unaccepted owner</text>
+  <rect x="385" y="615" width="290" height="84" rx="13" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="530" y="645" text-anchor="middle" class="box-title">DISCUSSION ONLY</text>
+  <text x="530" y="668" text-anchor="middle" class="box-text">idea, question or discussion</text>
+  <text x="530" y="688" text-anchor="middle" class="box-text">cannot become a task automatically</text>
+
+  <!-- InsForge -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="170" width="330" height="138" rx="20" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  </g>
+  <text x="985" y="212" text-anchor="middle" class="box-title">InsForge Postgres</text>
+  <text x="985" y="242" text-anchor="middle" class="box-text">meeting + action proposals</text>
+  <text x="985" y="266" text-anchor="middle" class="box-text">original AI output + reviewer edits</text>
+  <text x="985" y="290" text-anchor="middle" class="box-text">workflow state + audit record</text>
+
+  <!-- Human review -->
+  <g filter="url(#shadow)">
+    <rect x="820" y="420" width="330" height="195" rx="22" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  </g>
+  <text x="985" y="463" text-anchor="middle" class="box-title">Human Review Gate</text>
+  <text x="985" y="495" text-anchor="middle" class="box-text">see exact quote and original suggestion</text>
+  <text x="985" y="521" text-anchor="middle" class="box-text">approve · edit · reject · re-extract</text>
+  <line x1="850" y1="546" x2="1120" y2="546" stroke="#f59e0b"/>
+  <text x="985" y="577" text-anchor="middle" class="box-text">Reviewer approves dispatch,</text>
+  <text x="985" y="599" text-anchor="middle" class="box-text">not an AI-created obligation.</text>
+
+  <!-- Outputs -->
+  <g filter="url(#shadow)">
+    <rect x="1225" y="170" width="300" height="145" rx="20" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  </g>
+  <text x="1375" y="207" text-anchor="middle" class="box-title">Assigned GitHub Issue</text>
+  <text x="1375" y="237" text-anchor="middle" class="box-text">only after reviewer approval</text>
+  <text x="1375" y="261" text-anchor="middle" class="box-text">and explicit self-commitment</text>
+  <text x="1375" y="285" text-anchor="middle" class="box-text">assigned to confirmed owner</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1225" y="425" width="300" height="145" rx="20" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+  </g>
+  <text x="1375" y="462" text-anchor="middle" class="box-title">Unassigned GitHub Issue</text>
+  <text x="1375" y="492" text-anchor="middle" class="box-text">reviewer-approved follow-up</text>
+  <text x="1375" y="516" text-anchor="middle" class="box-text">label: needs-confirmation</text>
+  <text x="1375" y="540" text-anchor="middle" class="box-text">no person is assigned</text>
+
+  <g filter="url(#shadow)">
+    <rect x="1225" y="680" width="300" height="145" rx="20" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+  </g>
+  <text x="1375" y="717" text-anchor="middle" class="box-title">Meeting Notes Only</text>
+  <text x="1375" y="747" text-anchor="middle" class="box-text">discussion is retained for context</text>
+  <text x="1375" y="771" text-anchor="middle" class="box-text">GitHub dispatch is blocked</text>
+  <text x="1375" y="795" text-anchor="middle" class="box-text">until a real commitment exists</text>
+
+  <!-- Audit -->
+  <g filter="url(#shadow)">
+    <rect x="795" y="875" width="380" height="145" rx="20" fill="#f8fafc" stroke="#475569" stroke-width="2"/>
+  </g>
+  <text x="985" y="918" text-anchor="middle" class="box-title">InsForge Audit &amp; Idempotency</text>
+  <text x="985" y="948" text-anchor="middle" class="box-text">stores final payload, review decision and result</text>
+  <text x="985" y="972" text-anchor="middle" class="box-text">prevents duplicate GitHub issue creation</text>
+  <text x="985" y="996" text-anchor="middle" class="box-text">keeps an evidence trail for every outcome</text>
+
+  <!-- Connections -->
+  <path d="M300 239 H365" class="blue-arrow"/>
+  <path d="M530 308 V390" class="blue-arrow"/>
+  <path d="M695 239 H820" class="blue-arrow"/>
+  <path d="M700 560 H760 Q785 560 785 535 H820" class="arrow"/>
+  <text x="732" y="530" text-anchor="middle" class="label">save proposals</text>
+  <path d="M985 308 V420" class="arrow"/>
+  <path d="M820 518 H730 Q700 518 700 500 H695" class="arrow"/>
+  <text x="744" y="480" text-anchor="middle" class="label">edit / re-extract</text>
+  <path d="M1150 458 H1185 Q1205 458 1205 242 H1225" class="blue-arrow"/>
+  <path d="M1150 518 H1225" class="arrow"/>
+  <path d="M1150 577 H1185 Q1205 577 1205 752 H1225" class="arrow"/>
+  <path d="M1375 315 V875 H1175" class="arrow"/>
+  <path d="M1375 570 V875 H1175" class="arrow"/>
+  <path d="M1375 825 V875 H1175" class="arrow"/>
+
+  <!-- Footer legend -->
+  <rect x="70" y="930" width="570" height="105" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="100" y="963" class="box-title">Safety rule</text>
+  <text x="100" y="991" class="box-text">A mention of a person is not ownership. Only that speaker’s explicit acceptance</text>
+  <text x="100" y="1014" class="box-text">in the transcript permits automatic GitHub assignment.</text>
+</svg>

@@ -1,0 +1,87 @@
+import pytest
+
+from src.durable_workflow import persist_candidates, review_candidate
+from src.state import ActionItem
+
+
+class FakeRepository:
+    def __init__(self):
+        self.tables = {name: [] for name in ("action_items", "workflow_runs", "audit_events", "action_item_reviews")}
+        self.sequence = 0
+
+    def list(self, table, filters=None, order=None):
+        rows = list(self.tables[table])
+        if filters and "meeting_id" in filters:
+            meeting_id = filters["meeting_id"].removeprefix("eq.")
+            rows = [row for row in rows if row.get("meeting_id") == meeting_id]
+        return rows
+
+    def find_one(self, table, filters):
+        for row in self.tables[table]:
+            if all(row.get(key) == value.removeprefix("eq.") for key, value in filters.items()):
+                return row
+        return None
+
+    def get_one(self, table, record_id):
+        return next((row for row in self.tables[table] if row["id"] == record_id), None)
+
+    def insert(self, table, record):
+        self.sequence += 1
+        row = {"id": f"{table}-{self.sequence}", **record}
+        self.tables[table].append(row)
+        return row
+
+    def update(self, table, record_id, changes):
+        row = self.get_one(table, record_id)
+        row.update(changes)
+        return row
+
+
+def explicit_candidate():
+    return ActionItem(
+        action_title="Publish the demo",
+        owner_name="Asha",
+        speaker_name="Asha",
+        classification="EXPLICIT_COMMITMENT",
+        owner_explicitly_accepted=True,
+        quote_provenance="Asha: I will publish the demo by Friday.",
+        priority="HIGH",
+        confidence_score=1.0,
+    )
+
+
+def test_candidates_are_persisted_before_review():
+    repository = FakeRepository()
+
+    saved = persist_candidates(repository, "meeting-1", "thread-1", [explicit_candidate()])
+
+    assert saved[0]["classification"] == "EXPLICIT_COMMITMENT"
+    assert repository.tables["workflow_runs"][0]["status"] == "AWAITING_REVIEW"
+    assert repository.tables["audit_events"][0]["event_type"] == "EXTRACTION_COMPLETED"
+
+
+def test_needs_confirmation_cannot_receive_an_assignee():
+    repository = FakeRepository()
+    item = repository.insert("action_items", {
+        "meeting_id": "meeting-1", "classification": "NEEDS_CONFIRMATION",
+        "owner_explicitly_accepted": False, "original_snapshot": {}, "final_title": "Review proposal",
+        "speaker_name": "Ravi", "priority": "MEDIUM", "confidence_score": 0.5,
+        "quote_provenance": "Can Asha review the proposal?", "extraction_reason": "Request", "review_status": "PENDING_REVIEW",
+    })
+
+    with pytest.raises(ValueError, match="explicit self-commitment"):
+        review_candidate(
+            repository, "meeting-1", item["id"], reviewer_name="Reviewer", decision="APPROVED", github_assignee_login="asha"
+        )
+
+
+def test_approved_explicit_commitment_can_store_a_verified_login():
+    repository = FakeRepository()
+    stored = persist_candidates(repository, "meeting-1", "thread-1", [explicit_candidate()])[0]
+
+    reviewed = review_candidate(
+        repository, "meeting-1", stored["id"], reviewer_name="Reviewer", decision="APPROVED", github_assignee_login="asha"
+    )
+
+    assert reviewed["review_status"] == "APPROVED"
+    assert repository.tables["action_item_reviews"][0]["decision"] == "APPROVED"

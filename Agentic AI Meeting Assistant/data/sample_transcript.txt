@@ -1,0 +1,7 @@
+Priya: Let's finalize the API endpoints by next Friday. I'll take ownership of writing the OpenAPI spec.
+Rahul: Sounds good. I'll work on the database schema migration and have it ready by Tuesday.
+Priya: Should we conduct a load test before deploying?
+Rahul: Yes, but let's decide on the load testing tool in our next sync.
+Avi: I can set up the CI/CD pipeline by end of month.
+Priya: Great. Rahul, can you also review the auth module?
+Rahul: Sure, I'll look at it by tomorrow.

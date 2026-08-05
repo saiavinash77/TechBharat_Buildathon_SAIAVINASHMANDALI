@@ -1,0 +1,14 @@
+{
+  "priya": {
+    "email": "priya@company.com",
+    "aliases": ["priya", "priya sharma"]
+  },
+  "rahul": {
+    "email": "rahul@company.com",
+    "aliases": ["rahul", "rahul mehta"]
+  },
+  "avi": {
+    "email": "avi@company.com",
+    "aliases": ["avi", "avinash", "sai avinash"]
+  }
+}

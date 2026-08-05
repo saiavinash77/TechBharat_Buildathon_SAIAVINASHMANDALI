@@ -1,0 +1,16 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+langgraph==1.2.10
+sqlalchemy>=2.0,<2.1
+python-dotenv>=1.0,<2
+pydantic>=2.10,<3
+groq>=0.37,<1
+instructor>=1.15,<2
+dateparser>=1.2,<2
+requests>=2.32,<3
+chainlit>=2.11,<3
+google-cloud-storage>=2.18,<4
+pytest>=8,<9
+
+# For InsForge Postgres deployment, install a PostgreSQL driver such as
+# psycopg[binary] in the deployment environment.
