@@ -10,11 +10,9 @@ from src.durable_workflow import dispatch_approved_candidates, persist_candidate
 from src.insforge_client import InsForgeConfigurationError, InsForgeRepository
 from src.media import MediaConfigurationError
 from src.media_workflow import confirm_upload, create_upload, transcribe_media
-from src.models import init_db
 from src.state import AgentState
 
 load_dotenv()
-init_db()  # Legacy local development database; production workflow writes to InsForge.
 
 app = FastAPI(title="Agentic AI Meeting Assistant")
 
@@ -52,6 +50,7 @@ class CandidateReviewRequest(BaseModel):
     priority: str | None = Field(default=None, pattern="^(HIGH|MEDIUM|LOW)$")
     resolved_due_date: str | None = None
     github_assignee_login: str | None = Field(default=None, max_length=100)
+    final_owner_name: str | None = Field(default=None, max_length=200)
 
 
 @app.post("/ingest")
@@ -67,12 +66,24 @@ def ingest(req: IngestRequest):
         "execution_results": [],
     }
     config = {"configurable": {"thread_id": req.meeting_id or req.meeting_date}}
+    thread_id = config["configurable"]["thread_id"]
     graph.invoke(state, config)
     snapshot = graph.get_state(config)
     interrupt_payload = None
-    if snapshot and snapshot.tasks and snapshot.tasks[0].interrupts:
+    if snapshot and snapshot.tasks and len(snapshot.tasks) > 0 and snapshot.tasks[0].interrupts:
         interrupt_payload = snapshot.tasks[0].interrupts[0].value
-    return {"status": "waiting_for_review", "thread_id": config["configurable"]["thread_id"], "review": interrupt_payload}
+
+    if interrupt_payload is None:
+        extracted = snapshot.values.get("extracted") if snapshot else None
+        err = snapshot.values.get("error") if snapshot else None
+        if extracted is not None and getattr(extracted, "executive_summary", "").startswith("Extraction failed"):
+            err = extracted.executive_summary
+        return {
+            "status": "extraction_failed",
+            "thread_id": thread_id,
+            "error": err or "Extraction did not produce reviewable candidates.",
+        }
+    return {"status": "waiting_for_review", "thread_id": thread_id, "review": interrupt_payload}
 
 
 @app.post("/review")
@@ -113,13 +124,21 @@ def _start_media_review(media: dict, transcript: str) -> dict | None:
     }, config)
     snapshot = graph.get_state(config)
     repository.update("meetings", meeting["id"], {"processing_status": "AWAITING_REVIEW"})
-    if snapshot and snapshot.tasks and snapshot.tasks[0].interrupts:
+    if snapshot and snapshot.tasks and len(snapshot.tasks) > 0 and snapshot.tasks[0].interrupts:
         extracted = snapshot.values.get("extracted")
         candidates = persist_candidates(repository, meeting["id"], thread_id, extracted.action_items if extracted else [])
         payload = dict(snapshot.tasks[0].interrupts[0].value)
         payload["items"] = candidates
         return {"thread_id": thread_id, "payload": payload}
-    return {"thread_id": thread_id, "payload": None}
+    # Either extraction failed or the graph ended without a review interrupt.
+    # Surface a descriptive error to the caller instead of returning payload=None silently.
+    extracted = snapshot.values.get("extracted") if snapshot else None
+    err_detail = None
+    if extracted is not None and getattr(extracted, "executive_summary", "").startswith("Extraction failed"):
+        err_detail = extracted.executive_summary
+    raise RuntimeError(
+        err_detail or "Extraction did not produce any reviewable candidates. Check that the transcript is long enough and Groq credentials are configured."
+    )
 
 
 @app.post("/media/uploads")
@@ -180,6 +199,7 @@ def review_action_item(meeting_id: str, action_item_id: str, req: CandidateRevie
             priority=req.priority,
             resolved_due_date=req.resolved_due_date,
             github_assignee_login=req.github_assignee_login,
+            final_owner_name=req.final_owner_name,
         )
     except Exception as error:
         raise _media_error(error) from error

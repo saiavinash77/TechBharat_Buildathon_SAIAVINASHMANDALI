@@ -11,6 +11,11 @@ build/
 .venv/
 venv/
 
+# GCP service account keys (never commit)
+*-sa-key.json
+service-account*.json
+google-credentials.json
+
 # InsForge & AI agent skills
 .insforge
 .agent

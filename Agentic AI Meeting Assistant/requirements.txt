@@ -14,3 +14,10 @@ pytest>=8,<9
 
 # For InsForge Postgres deployment, install a PostgreSQL driver such as
 # psycopg[binary] in the deployment environment.
+# psycopg[binary]>=3,<4
+
+# OPTIONAL: uncomment to enable deferred cross-meeting RAG with local ChromaDB.
+# Chroma + sentence-transformers are heavy (~1.5 GB install) and not required
+# for the extract → review → dispatch pipeline.
+# chromadb>=0.5,<1
+# sentence-transformers>=3,<4
