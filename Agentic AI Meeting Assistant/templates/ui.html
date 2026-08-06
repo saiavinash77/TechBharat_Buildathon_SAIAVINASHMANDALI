@@ -675,7 +675,7 @@
         const msg = err && err.message ? err.message : String(err);
         let hint = '';
         if (msg.toLowerCase().includes('network error') || msg.toLowerCase().includes('upload aborted') || msg === '') {
-          hint = ' Possible causes: the GCS bucket CORS is not configured to allow PUT/OPTIONS from this origin, or the signed URL requires different headers (check Content-Type). Use the browser Network tab to inspect the OPTIONS/PUT response and run `gsutil cors get gs://YOUR_BUCKET` to view CORS. To set CORS, create a cors.json with origin http://127.0.0.1:8000 and run `gsutil cors set cors.json gs://YOUR_BUCKET`.';
+          hint = ' Possible causes: the GCS bucket CORS is not configured to allow PUT/OPTIONS from this origin, or the signed URL requires different headers (check Content-Type). Use the browser Network tab to inspect the OPTIONS/PUT response and run `gsutil cors get gs://YOUR_BUCKET` to view CORS. To set CORS, create a cors.json with origins ["http://127.0.0.1:8000","http://localhost:8000"] and run `gsutil cors set cors.json gs://YOUR_BUCKET`.';
         }
         statusText.textContent = `❌ Upload failed: ${msg}${hint}`;
         progressBar.style.background = '#EF4444';
