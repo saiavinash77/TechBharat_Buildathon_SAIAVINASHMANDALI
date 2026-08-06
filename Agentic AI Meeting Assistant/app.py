@@ -22,6 +22,30 @@ def _groq_client() -> Groq:
     return Groq(api_key=api_key)
 
 
+async def _process_media_file(file_path: str, file_name: str, mime_type: str, file_size: int):
+    """Upload media file to GCS via Signed URL and run Groq Whisper transcription."""
+    try:
+        await cl.Message(content=f"⏳ Preparing private GCS upload for `{file_name}`...").send()
+        upload = create_upload("Uploaded meeting", date.today(), file_name, mime_type, file_size)
+        
+        import requests
+        with open(file_path, "rb") as media_file:
+            response = requests.put(
+                upload["upload_url"],
+                data=media_file,
+                headers={"Content-Type": mime_type},
+                timeout=120
+            )
+        response.raise_for_status()
+        confirm_upload(upload["media"]["id"])
+        
+        await cl.Message(content="🎙️ Transcribing media via Groq Whisper...").send()
+        _, transcription = transcribe_media(upload["media"]["id"])
+        await _start_review(transcription.text, date.today().isoformat(), upload["meeting"]["meeting_key"])
+    except Exception as error:
+        await cl.Message(content=f"❌ Media upload/transcription failed: {error}").send()
+
+
 async def _start_review(transcript: str, meeting_date: str, meeting_id: str):
     state: AgentState = {
         "transcript": transcript,
@@ -59,8 +83,10 @@ async def start():
     await cl.Message(
         content=(
             "### 🎙️ Agentic AI Meeting Assistant\n\n"
-            "Paste a meeting transcript below, ask a question about the meeting, or use `/upload` to upload an audio/video recording.\n\n"
-            "*Safety-First*: AI extracts candidates with timestamp evidence, but no GitHub issues are created without your explicit approval."
+            "• **Attach or Drag & Drop** any audio/video file directly into chat!\n"
+            "• **Paste a transcript text** (>50 characters) to analyze.\n"
+            "• **Ask questions** about your active meeting transcript at any time.\n\n"
+            "*Safety-First*: AI proposes action items with timestamp evidence, but no GitHub issues are created without your explicit approval."
         )
     ).send()
 
@@ -71,6 +97,18 @@ async def main(message: cl.Message):
     thread_id = cl.user_session.get("thread_id")
     awaiting = cl.user_session.get("awaiting_feedback", False)
 
+    # 1. Handle Direct File Attachments (Drag & Drop or Attachment button)
+    if message.elements:
+        for element in message.elements:
+            file_path = getattr(element, "path", None)
+            file_name = getattr(element, "name", "recording.mp4")
+            mime_type = getattr(element, "mime", "video/mp4") or "video/mp4"
+            file_size = getattr(element, "size", 0) or 0
+            if file_path:
+                await _process_media_file(file_path, file_name, mime_type, file_size)
+                return
+
+    # 2. Handle /upload Slash Command
     if text == "/upload":
         files = await cl.AskFileMessage(
             content="Upload a meeting recording (MP3, WAV, M4A, MP4, WebM, OGG, or FLAC file up to 100 MB).",
@@ -85,23 +123,10 @@ async def main(message: cl.Message):
         if not files:
             return
         uploaded = files[0]
-        try:
-            await cl.Message(content=f"⏳ Preparing private upload for `{uploaded.name}`...").send()
-            upload = create_upload("Uploaded meeting", date.today(), uploaded.name, uploaded.mime or "audio/mpeg", uploaded.size or 0)
-            
-            import requests
-            with open(uploaded.path, "rb") as media_file:
-                response = requests.put(upload["upload_url"], data=media_file, headers={"Content-Type": uploaded.mime or "audio/mpeg"}, timeout=120)
-            response.raise_for_status()
-            confirm_upload(upload["media"]["id"])
-            
-            await cl.Message(content="🎙️ Transcribing media via Groq Whisper...").send()
-            _, transcription = transcribe_media(upload["media"]["id"])
-            await _start_review(transcription.text, date.today().isoformat(), upload["meeting"]["meeting_key"])
-        except Exception as error:
-            await cl.Message(content=f"❌ Media upload failed: {error}").send()
+        await _process_media_file(uploaded.path, uploaded.name, uploaded.mime or "audio/mpeg", uploaded.size or 0)
         return
 
+    # 3. Handle Re-extraction Feedback
     if awaiting:
         cl.user_session.set("awaiting_feedback", False)
         if thread_id:
@@ -112,33 +137,46 @@ async def main(message: cl.Message):
                 await _show_extraction(snapshot.values["extracted"], candidates)
         return
 
-    if text.endswith("?") and thread_id:
-        transcript = cl.user_session.get("transcript", "")
-        try:
-            response = _groq_client().chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                temperature=0,
-                messages=[
-                    {"role": "system", "content": "Answer strictly from the meeting transcript. Include exact quotes for evidence. If evidence is missing, state so clearly."},
-                    {"role": "user", "content": f"Transcript:\n{transcript}\n\nQuestion: {text}"},
-                ],
-            )
-            await cl.Message(content=f"**Answer (Evidence-Backed)**:\n\n{response.choices[0].message.content}").send()
-        except Exception as error:
-            await cl.Message(content=f"❌ Question answering failed: {error}").send()
-        return
-
+    # 4. Handle Status Check
     if text.startswith("/status"):
         await cl.Message(content=f"📌 Active meeting thread: `{thread_id}`" if thread_id else "No active meeting thread.").send()
         return
 
-    if len(text) > 50:
+    # 5. Handle Meeting Transcript Ingestion (Long text)
+    if len(text) > 50 and not (thread_id and (text.endswith("?") or any(w in text.lower() for w in ["what", "who", "why", "how", "tell", "summarize", "explain", "describe"]))):
         await cl.Message(content="🧠 Analyzing transcript and extracting action candidates...").send()
         meeting_key = f"mtg_{abs(hash(text)) % 100000}"
         await _start_review(text, date.today().isoformat(), meeting_key)
         return
 
-    await cl.Message(content="Paste a meeting transcript (>50 chars), ask a question ending in `?`, or type `/upload`.").send()
+    # 6. Handle Questions over Active Meeting Transcript
+    if thread_id:
+        transcript = cl.user_session.get("transcript", "")
+        if transcript:
+            try:
+                response = _groq_client().chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    temperature=0,
+                    messages=[
+                        {"role": "system", "content": "Answer strictly from the meeting transcript. Include exact quotes for evidence. If evidence is missing, state so clearly."},
+                        {"role": "user", "content": f"Transcript:\n{transcript}\n\nQuestion: {text}"},
+                    ],
+                )
+                await cl.Message(content=f"**Answer (Evidence-Backed)**:\n\n{response.choices[0].message.content}").send()
+                return
+            except Exception as error:
+                await cl.Message(content=f"❌ Question answering failed: {error}").send()
+                return
+
+    # 7. Default Helpful Guidance Message
+    await cl.Message(
+        content=(
+            "👋 Welcome! To get started:\n\n"
+            "1. **Attach/Drag & Drop** an audio or video file into the chat.\n"
+            "2. Or **paste a text transcript** (>50 characters).\n"
+            "3. Once loaded, ask any question about the meeting!"
+        )
+    ).send()
 
 
 async def _show_extraction(extracted, candidates: list):
