@@ -237,6 +237,29 @@
     }
 
     .hidden { display: none; }
+
+    /* Upload snackbar (floating) */
+    #upload-snackbar {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      background: linear-gradient(90deg, rgba(124,92,255,0.06), rgba(54,209,220,0.04));
+      border: 1px solid rgba(255,255,255,0.04);
+      padding: 0.6rem 0.9rem;
+      border-radius: 0.6rem;
+      backdrop-filter: blur(8px);
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      min-width: 220px;
+      box-shadow: 0 8px 20px rgba(2,6,23,0.5);
+      z-index: 1200;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+    #upload-snackbar .meta { flex: 1; }
+    #upload-snackbar button { padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+
   </style>
 </head>
 <body>
@@ -318,6 +341,21 @@
     <div id="results-container" class="card hidden">
       <h2>🚀 Execution & Audit Log Results</h2>
       <div id="results-list" style="margin-top: 1rem;"></div>
+    </div>
+  </div>
+
+  <!-- Upload Snackbar (background uploads) -->
+  <div id="upload-snackbar" class="hidden" role="status" aria-live="polite">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <div style="width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,var(--accent-a),var(--accent-b));box-shadow:0 6px 18px rgba(56,40,120,0.35)"></div>
+    </div>
+    <div class="meta">
+      <div id="upload-snackbar-file" style="font-weight:600;">Uploading…</div>
+      <div id="upload-snackbar-status" style="font-size:0.85rem;color:var(--text-muted)">0% • …</div>
+    </div>
+    <div style="display:flex;gap:0.4rem;">
+      <button class="btn" id="upload-snackbar-focus">Open</button>
+      <button class="btn btn-red" id="upload-snackbar-cancel">Cancel</button>
     </div>
   </div>
 
@@ -459,19 +497,55 @@
           await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             window.__currentXhr = xhr;
+            let lastLoaded = 0;
+            let lastTime = Date.now();
+
             xhr.open('PUT', prepData.upload_url, true);
             xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+
+            // Show background upload snackbar
+            try {
+              const snack = document.getElementById('upload-snackbar');
+              const snackFile = document.getElementById('upload-snackbar-file');
+              const snackStatus = document.getElementById('upload-snackbar-status');
+              if (snack && snackFile && snackStatus) {
+                snackFile.textContent = file.name;
+                snackStatus.textContent = '0% • …';
+                snack.classList.remove('hidden');
+                document.getElementById('upload-snackbar-cancel').onclick = cancelUpload;
+                document.getElementById('upload-snackbar-focus').onclick = () => { document.getElementById('tab-upload').scrollIntoView({behavior: 'smooth'}); };
+              }
+            } catch (e) { /* ignore UI binding errors */ }
+
+            window.__cancelUpload = false;
+
             xhr.upload.onprogress = (e) => {
               if (e.lengthComputable) {
-                const pct = ((e.loaded / e.total) * 100).toFixed(0);
+                const now = Date.now();
+                const loaded = e.loaded;
+                const dt = (now - lastTime) / 1000;
+                const delta = loaded - lastLoaded;
+                const speed = dt > 0 ? (delta / dt) : 0; // bytes/sec
+                lastLoaded = loaded;
+                lastTime = now;
+                const pct = Math.min(100, Math.round((loaded / e.total) * 100));
                 progressBar.style.width = pct + '%';
-                statusText.textContent = `2/4 Uploading directly to GCP Storage: ${pct}%`;
+                const remaining = speed > 50 ? Math.max(0, Math.round((e.total - loaded) / speed)) : null;
+                statusText.textContent = remaining !== null ? `2/4 Uploading directly to GCP Storage: ${pct}% • ${remaining}s remaining` : `2/4 Uploading directly to GCP Storage: ${pct}%`;
+                const snackStatus = document.getElementById('upload-snackbar-status');
+                if (snackStatus) snackStatus.textContent = remaining !== null ? `${pct}% • ${remaining}s` : `${pct}% • ...`;
               }
             };
+
             xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
             xhr.onerror = () => reject(new Error('Network error during GCS upload'));
+            xhr.onabort = () => reject(new Error('Upload aborted'));
             xhr.send(file);
-          }).finally(() => { document.getElementById('cancel-upload').classList.add('hidden'); window.__currentXhr = null; });
+          }).finally(() => { 
+            try { document.getElementById('cancel-upload').classList.add('hidden'); } catch(e){}
+            window.__currentXhr = null; 
+            try { document.getElementById('upload-snackbar').classList.add('hidden'); } catch(e){}
+          });
         }
 
         // 3. Confirm Upload & Transcribe
@@ -507,7 +581,12 @@
         document.getElementById('reset-upload').classList.remove('hidden');
         renderUploadHistory();
       } catch (err) {
-        statusText.textContent = `❌ Upload failed: ${err.message}`;
+        const msg = err && err.message ? err.message : String(err);
+        let hint = '';
+        if (msg.toLowerCase().includes('network error') || msg.toLowerCase().includes('upload aborted') || msg === '') {
+          hint = ' Possible causes: the GCS bucket CORS is not configured to allow PUT/OPTIONS from this origin, or the signed URL requires different headers (check Content-Type). Use the browser Network tab to inspect the OPTIONS/PUT response and run `gsutil cors get gs://YOUR_BUCKET` to view CORS. To set CORS, create a cors.json with origin http://127.0.0.1:8000 and run `gsutil cors set cors.json gs://YOUR_BUCKET`.';
+        }
+        statusText.textContent = `❌ Upload failed: ${msg}${hint}`;
         progressBar.style.background = '#EF4444';
       }
     }
@@ -665,6 +744,7 @@
       document.getElementById('status-text').textContent = '❌ Upload cancelled.';
       document.getElementById('cancel-upload').classList.add('hidden');
       document.getElementById('reset-upload').classList.remove('hidden');
+      try { document.getElementById('upload-snackbar').classList.add('hidden'); } catch(e){}
     }
 
     function resetUI() {
