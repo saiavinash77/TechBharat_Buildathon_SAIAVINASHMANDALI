@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from langgraph.types import Command
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from src.graph import graph
 from src.durable_workflow import dispatch_approved_candidates, persist_candidates, review_candidate
 from src.insforge_client import InsForgeConfigurationError, InsForgeRepository
-from src.media import MediaConfigurationError
+from src.media import MediaConfigurationError, GCSMediaStore
 from src.media_workflow import confirm_upload, create_upload, transcribe_media
 from src.state import AgentState
 
@@ -163,6 +163,31 @@ def prepare_media_upload(req: MediaUploadRequest):
             "upload_url": result["upload_url"],
             "upload_method": "PUT",
             "required_headers": {"Content-Type": req.content_type},
+        }
+    except Exception as error:
+        raise _media_error(error) from error
+
+
+@app.post("/media/direct-upload")
+async def direct_media_upload(file: UploadFile = File(...)):
+    """Upload media file directly to GCS and transcribe in 1 call."""
+    try:
+        content = await file.read()
+        filename = Path(file.filename or "recording.mp4").name
+        content_type = file.content_type or "video/mp4"
+        upload = create_upload(filename, date.today(), filename, content_type, len(content))
+        
+        store = GCSMediaStore()
+        store.upload_bytes(upload["media"]["object_key"], content, content_type)
+        confirm_upload(upload["media"]["id"])
+        
+        media, transcription = transcribe_media(upload["media"]["id"])
+        review = _start_media_review(media, transcription.text)
+        return {
+            "media_id": upload["media"]["id"],
+            "meeting_id": upload["meeting"]["id"],
+            "status": "awaiting_review",
+            "review": review,
         }
     except Exception as error:
         raise _media_error(error) from error

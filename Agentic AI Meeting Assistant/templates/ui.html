@@ -344,36 +344,69 @@
         if (!prepRes.ok) throw new Error(await prepRes.text());
         const prepData = await prepRes.json();
 
-        // 2. Direct GCS Upload with Progress XHR
-        statusText.textContent = '2/4 Uploading directly to GCP Cloud Storage...';
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', prepData.upload_url, true);
-          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const pct = ((e.loaded / e.total) * 100).toFixed(0);
-              progressBar.style.width = pct + '%';
-              statusText.textContent = `2/4 Uploading directly to GCP Storage: ${pct}%`;
-            }
-          };
-          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
-          xhr.onerror = () => reject(new Error('Network error during GCS upload'));
-          xhr.send(file);
-        });
+        // 2. Direct GCS Upload with Progress XHR (with backend fallback)
+        statusText.textContent = '2/4 Uploading to GCP Cloud Storage...';
+        let uploadSucceeded = false;
 
-        // 3. Confirm Upload & Transcribe
-        statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
-        await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+        try {
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', prepData.upload_url, true);
+            xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const pct = ((e.loaded / e.total) * 100).toFixed(0);
+                progressBar.style.width = pct + '%';
+                statusText.textContent = `2/4 Uploading to GCP Storage: ${pct}%`;
+              }
+            };
+            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
+            xhr.onerror = () => reject(new Error('CORS/Network error during direct GCS upload'));
+            xhr.send(file);
+          });
+          uploadSucceeded = true;
+        } catch (uploadErr) {
+          console.warn('Direct GCS upload failed, falling back to backend stream:', uploadErr);
+        }
 
-        statusText.textContent = '4/4 Transcribing & extracting action items with Groq...';
-        const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
-        if (!transRes.ok) throw new Error(await transRes.text());
-        const transData = await transRes.json();
+        if (uploadSucceeded) {
+          // 3. Confirm Upload & Transcribe
+          statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
+          await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
 
-        statusText.textContent = '✅ Extraction Complete!';
-        activeMeetingId = prepData.meeting_id;
-        renderReviewCards(transData.review ? transData.review.payload : null);
+          statusText.textContent = '4/4 Transcribing & extracting action items with Groq...';
+          const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
+          if (!transRes.ok) throw new Error(await transRes.text());
+          const transData = await transRes.json();
+
+          statusText.textContent = '✅ Extraction Complete!';
+          activeMeetingId = prepData.meeting_id;
+          renderReviewCards(transData.review ? transData.review.payload : null);
+        } else {
+          // Fallback: Upload via /media/direct-upload
+          statusText.textContent = '2/4 Uploading media stream to backend...';
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const directRes = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/media/direct-upload', true);
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const pct = ((e.loaded / e.total) * 100).toFixed(0);
+                progressBar.style.width = pct + '%';
+                statusText.textContent = `2/4 Uploading media stream: ${pct}%`;
+              }
+            };
+            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve(JSON.parse(xhr.responseText)) : reject(new Error('Direct upload HTTP ' + xhr.status));
+            xhr.onerror = () => reject(new Error('Network error during media upload'));
+            xhr.send(formData);
+          });
+
+          statusText.textContent = '✅ Extraction Complete!';
+          activeMeetingId = directRes.meeting_id;
+          renderReviewCards(directRes.review ? directRes.review.payload : null);
+        }
 
       } catch (err) {
         statusText.textContent = `❌ Upload failed: ${err.message}`;
