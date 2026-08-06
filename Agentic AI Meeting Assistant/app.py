@@ -1,5 +1,6 @@
 import os
 from datetime import date
+from pathlib import Path
 
 import chainlit as cl
 from dotenv import load_dotenv
