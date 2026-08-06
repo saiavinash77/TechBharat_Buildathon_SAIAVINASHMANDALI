@@ -30,12 +30,16 @@ def max_upload_bytes() -> int:
         raise MediaConfigurationError("MEDIA_MAX_UPLOAD_BYTES must be an integer") from error
 
 
-def validate_media(filename: str, content_type: str, size_bytes: int) -> None:
-    if not filename or Path(filename).name != filename:
+def validate_media(filename: str, content_type: str, size_bytes: int | str) -> None:
+    if not filename or Path(filename).name != filename or "/" in filename or "\\" in filename:
         raise ValueError("filename must be a simple file name")
     if content_type not in SUPPORTED_CONTENT_TYPES:
         raise ValueError("Unsupported media type. Use MP3, WAV, M4A, MP4, WebM, OGG, or FLAC.")
-    if size_bytes <= 0 or size_bytes > max_upload_bytes():
+    try:
+        size_int = int(size_bytes)
+    except (ValueError, TypeError) as error:
+        raise ValueError("size_bytes must be a valid integer.") from error
+    if size_int <= 0 or size_int > max_upload_bytes():
         raise ValueError(f"Media must be between 1 byte and {max_upload_bytes()} bytes.")
 
 

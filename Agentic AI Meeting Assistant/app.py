@@ -101,10 +101,16 @@ async def main(message: cl.Message):
     if message.elements:
         for element in message.elements:
             file_path = getattr(element, "path", None)
-            file_name = getattr(element, "name", "recording.mp4")
+            raw_name = getattr(element, "name", "recording.mp4")
+            file_name = Path(raw_name).name if raw_name else "recording.mp4"
             mime_type = getattr(element, "mime", "video/mp4") or "video/mp4"
-            file_size = getattr(element, "size", 0) or 0
-            if file_path:
+            try:
+                file_size = int(getattr(element, "size", 0) or 0)
+            except (ValueError, TypeError):
+                file_size = 0
+            if file_path and os.path.exists(file_path):
+                if file_size <= 0:
+                    file_size = os.path.getsize(file_path)
                 await _process_media_file(file_path, file_name, mime_type, file_size)
                 return
 
