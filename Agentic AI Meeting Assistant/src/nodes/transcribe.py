@@ -80,5 +80,39 @@ def transcribe_url(media_url: str) -> TranscriptionResult:
 
 
 def transcribe_file_bytes(filename: str, content: bytes) -> TranscriptionResult:
-    """Transcribe binary file bytes directly from GCS media store."""
-    return _transcribe(file=(filename, content))
+    """Transcribe binary file bytes directly from GCS media store with automatic chunking for large files (>19MB)."""
+    CHUNK_SIZE = 19 * 1024 * 1024
+    if len(content) <= CHUNK_SIZE:
+        return _transcribe(file=(filename, content))
+
+    all_text = []
+    all_segments = []
+    total_duration = 0.0
+    seg_counter = 0
+
+    for i in range(0, len(content), CHUNK_SIZE):
+        chunk_data = content[i : i + CHUNK_SIZE]
+        chunk_name = f"chunk_{i // CHUNK_SIZE}_{filename}"
+        try:
+            res = _transcribe(file=(chunk_name, chunk_data))
+            if res.text:
+                all_text.append(res.text)
+            for seg in res.segments:
+                seg.index = seg_counter
+                seg.start_seconds += total_duration
+                seg.end_seconds += total_duration
+                all_segments.append(seg)
+                seg_counter += 1
+            if res.duration_seconds:
+                total_duration += res.duration_seconds
+        except Exception as error:
+            # If a trailing chunk fails, continue with already transcribed segments
+            if not all_text:
+                raise error
+            break
+
+    return TranscriptionResult(
+        text=" ".join(all_text),
+        duration_seconds=total_duration,
+        segments=all_segments,
+    )
