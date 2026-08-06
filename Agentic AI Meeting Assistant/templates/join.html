@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Join Organization</title>
+    <style>
+      body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; padding: 2rem; background:#0b1020; color:#e6eef8 }
+      .card { background: rgba(255,255,255,0.03); padding:1.25rem; border-radius:8px; max-width:720px; margin:0 auto }
+      label { display:block; margin-top:0.75rem; font-size:0.9rem }
+      input { width:100%; padding:0.5rem; border-radius:6px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:inherit }
+      .btn { margin-top:1rem; padding:0.5rem 0.85rem; background:#2563eb; color:white; border-radius:6px; border:none; cursor:pointer }
+      .muted { color: #9aa7bf; font-size:0.9rem }
+      .success { color:#86efac }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Join Organization</h2>
+      <div id="invite-info" class="muted">Loading invite...</div>
+      <form id="join-form" onsubmit="return submitJoin();">
+        <input type="hidden" id="token">
+        <label>Name</label>
+        <input id="name" required />
+        <label>Email</label>
+        <input id="email" type="email" required />
+        <label>GitHub handle (optional)</label>
+        <input id="github_handle" placeholder="e.g. octocat" />
+        <button class="btn" type="submit">Join</button>
+      </form>
+      <div id="result" style="margin-top:1rem;display:none"></div>
+      <div style="margin-top:1rem"><a href="/ui" style="color:#60a5fa">Back to UI</a></div>
+    </div>
+
+    <script>
+      async function parseQuery() {
+        const params = new URLSearchParams(location.search);
+        return params.get('token');
+      }
+
+      async function loadInvite() {
+        const token = await parseQuery();
+        if (!token) {
+          document.getElementById('invite-info').textContent = 'Missing token in URL.'; return;
+        }
+        document.getElementById('token').value = token;
+        try {
+          const res = await fetch(`/join?token=${encodeURIComponent(token)}`);
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          document.getElementById('invite-info').innerHTML = `Invite to <strong>${data.org_id}</strong> from <em>${data.inviter_name || 'someone'}</em>`;
+        } catch (err) {
+          document.getElementById('invite-info').textContent = 'Invite not found or expired.';
+          console.error(err);
+        }
+      }
+
+      async function submitJoin() {
+        const token = document.getElementById('token').value;
+        const name = document.getElementById('name').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const github_handle = document.getElementById('github_handle').value.trim() || null;
+        if (!name || !email) return alert('Please provide name and email');
+        try {
+          const res = await fetch('/join', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, name, email, github_handle })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+          const r = document.getElementById('result');
+          r.style.display = 'block'; r.className = 'success';
+          r.textContent = `Joined ${data.org_id} — welcome ${data.user.name || data.user.email}`;
+        } catch (err) {
+          alert('Join failed: ' + (err.message || err));
+        }
+        return false;
+      }
+
+      loadInvite();
+    </script>
+  </body>
+</html>
