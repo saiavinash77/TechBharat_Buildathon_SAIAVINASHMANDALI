@@ -221,9 +221,9 @@ async def _show_extraction(extracted, candidates: list):
     await cl.Message(
         content="Choose an action to manage these candidate items before GitHub dispatch:",
         actions=[
-            cl.Action(name="approve_all", value="approve", label="✅ Approve Eligible Items", collapsed=False),
-            cl.Action(name="reject_all", value="reject", label="❌ Reject All", collapsed=False),
-            cl.Action(name="re_extract", value="re_extract", label="🔄 Re-extract with Instructions", collapsed=False),
+            cl.Action(name="approve_all", payload={"value": "approve"}, label="✅ Approve Eligible Items", collapsed=False),
+            cl.Action(name="reject_all", payload={"value": "reject"}, label="❌ Reject All", collapsed=False),
+            cl.Action(name="re_extract", payload={"value": "re_extract"}, label="🔄 Re-extract with Instructions", collapsed=False),
         ]
     ).send()
 
