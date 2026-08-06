@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from src.insforge_client import InsForgeRepository
 from src.media import GCSMediaStore, build_object_key, validate_media
-from src.nodes.transcribe import TranscriptionResult, transcribe_url
+from src.nodes.transcribe import TranscriptionResult, transcribe_url, transcribe_file_bytes
 
 
 def create_upload(meeting_title: str, meeting_date: date, filename: str, content_type: str, size_bytes: int) -> dict:
