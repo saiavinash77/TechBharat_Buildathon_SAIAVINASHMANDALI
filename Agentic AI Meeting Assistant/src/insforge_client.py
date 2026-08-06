@@ -16,7 +16,19 @@ class InsForgeRepository:
     def __init__(self, base_url: str | None = None, api_key: str | None = None, session=None):
         self.base_url = (base_url or os.getenv("INSFORGE_URL", "")).rstrip("/")
         self.api_key = api_key or os.getenv("INSFORGE_API_KEY", "")
-        if not self.base_url or not self.api_key:
+        if not self.api_key or "replace_with" in self.api_key:
+            import json
+            from pathlib import Path
+            proj_file = Path(".insforge/project.json")
+            if proj_file.exists():
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                    self.api_key = data.get("api_key", self.api_key)
+                    if not self.base_url:
+                        self.base_url = data.get("oss_host", self.base_url).rstrip("/")
+                except Exception:
+                    pass
+        if not self.base_url or not self.api_key or "replace_with" in self.api_key:
             raise InsForgeConfigurationError("INSFORGE_URL and server-only INSFORGE_API_KEY are required.")
         self.session = session or requests.Session()
 
