@@ -3,27 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agentic AI Meeting Assistant — Safety-First Review Gate</title>
+  <title>Nova — Meeting Intelligence & Action Automation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
-      --glass-bg: rgba(30, 41, 59, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --accent-blue: #3B82F6;
-      --accent-purple: #8B5CF6;
+      /* Nova theme tokens */
+      --bg-gradient: linear-gradient(135deg, #071029 0%, #0f1b38 55%, #071029 100%);
+      --glass-bg: rgba(20, 30, 54, 0.64);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --accent-a: #7C5CFF; /* violet */
+      --accent-b: #36D1DC; /* teal */
       --accent-green: #10B981;
       --accent-yellow: #F59E0B;
       --accent-red: #EF4444;
-      --text-main: #F8FAFC;
-      --text-muted: #94A3B8;
+      --text-main: #E6EEF6;
+      --text-muted: #9AA9BF;
+      --card-bg: rgba(255,255,255,0.04);
+      --focus: rgba(124,92,255,0.18);
+      --brand-gradient: linear-gradient(90deg, var(--accent-a), var(--accent-b));
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: var(--bg-gradient);
       color: var(--text-main);
       min-height: 100vh;
@@ -32,6 +36,8 @@
       justify-content: center;
     }
 
+    /* Headings use Poppins for stronger brand feel */
+    h1, h2, h3 { font-family: 'Poppins', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
     .container {
       width: 100%;
       max-width: 1000px;
@@ -236,8 +242,11 @@
 <body>
   <div class="container">
     <header>
-      <h1>🎙️ Agentic AI Meeting Assistant</h1>
-      <p>Direct GCS Storage Streaming & Safety-First Human Review Gate</p>
+      <h1 style="display:flex;align-items:center;gap:0.6rem;">
+        <img src="/templates/nova-mark.svg" alt="Nova" style="height:1.25rem;width:1.25rem;display:inline-block;vertical-align:middle;filter:drop-shadow(0 1px 6px rgba(0,0,0,0.35));">
+        Nova — Meeting Intelligence & Action Automation
+      </h1>
+      <p>Turn recordings into reliable action — fast, safe, and human‑approved</p>
       <div class="badges">
         <span class="badge">GCP Cloud Storage (Direct GCS)</span>
         <span class="badge">Groq Whisper (2s STT)</span>
