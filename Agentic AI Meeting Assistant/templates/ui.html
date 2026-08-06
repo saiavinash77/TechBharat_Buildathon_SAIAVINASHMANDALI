@@ -259,8 +259,13 @@
           <input type="file" id="file-input" accept="audio/*,video/*" onchange="handleFileSelect(event)">
         </div>
         <div id="file-info" style="margin-top: 0.75rem; font-size: 0.9rem; color: #A78BFA;"></div>
+        <div id="preview-container" style="margin-top:0.75rem"></div>
         <div class="progress-bar-container" id="progress-container">
           <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div style="display:flex; justify-content:center; gap:0.5rem; margin-top:0.5rem;">
+          <button id="cancel-upload" class="btn btn-red hidden" onclick="cancelUpload()">✖ Cancel</button>
+          <button id="reset-upload" class="btn hidden" onclick="resetUI()">↺ Reset</button>
         </div>
         <div class="status-text" id="status-text"></div>
       </div>
@@ -294,6 +299,34 @@
   <script>
     let activeMeetingId = null;
     let currentCandidates = [];
+    let MEDIA_MAX_UPLOAD_BYTES = 524288000; // default; overridden from server /config
+
+    // Small helper to format bytes
+    function fmtBytes(n) {
+      if (n < 1024) return n + ' B';
+      if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+      if (n < 1024*1024*1024) return (n/(1024*1024)).toFixed(1) + ' MB';
+      return (n/(1024*1024*1024)).toFixed(2) + ' GB';
+    }
+
+    // Fetch server config for upload limits
+    (async function loadConfig(){
+      try {
+        const res = await fetch('/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg && cfg.media_max_upload_bytes) {
+            MEDIA_MAX_UPLOAD_BYTES = cfg.media_max_upload_bytes;
+            const info = document.getElementById('file-info');
+            if (info && !info.textContent) {
+              info.textContent = `Max upload: ${fmtBytes(MEDIA_MAX_UPLOAD_BYTES)}`;
+            }
+          }
+        }
+      } catch(e) {
+        // ignore — keep default
+      }
+    })();
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -323,7 +356,13 @@
       const statusText = document.getElementById('status-text');
       const fileInfo = document.getElementById('file-info');
 
-      fileInfo.textContent = `Selected: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+      // Validate file size against server-provided max
+      if (file.size > MEDIA_MAX_UPLOAD_BYTES) {
+        const maxStr = fmtBytes(MEDIA_MAX_UPLOAD_BYTES);
+        alert(`File too large. Maximum allowed is ${maxStr}.`);
+        return;
+      }
+      fileInfo.textContent = `Selected: ${file.name} (${fmtBytes(file.size)})`;
       progressContainer.style.display = 'block';
       progressBar.style.width = '0%';
       statusText.textContent = '1/4 Requesting private GCS upload URL...';
@@ -344,37 +383,82 @@
         if (!prepRes.ok) throw new Error(await prepRes.text());
         const prepData = await prepRes.json();
 
-        // 2. Direct GCS Upload with Progress XHR
-        statusText.textContent = '2/4 Uploading directly to GCP Cloud Storage...';
-        await new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', prepData.upload_url, true);
-          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const pct = ((e.loaded / e.total) * 100).toFixed(0);
+        // Show preview
+        showPreview(file);
+
+        // 2. Direct GCS Upload with Progress XHR (or simulated if mock URL)
+        const isMock = prepData.upload_url && prepData.upload_url.includes('example.invalid');
+        if (isMock) {
+          statusText.textContent = '2/4 Simulating upload (dry-run mode)...';
+          document.getElementById('cancel-upload').classList.remove('hidden');
+          let pct = 0;
+          await new Promise((resolve, reject) => {
+            const id = setInterval(() => {
+              pct = Math.min(100, pct + Math.floor(Math.random() * 12) + 6);
               progressBar.style.width = pct + '%';
-              statusText.textContent = `2/4 Uploading directly to GCP Storage: ${pct}%`;
-            }
-          };
-          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
-          xhr.onerror = () => reject(new Error('Network error during GCS upload'));
-          xhr.send(file);
-        });
+              statusText.textContent = `2/4 Uploading (simulated): ${pct}%`;
+              if (pct >= 100) {
+                clearInterval(id);
+                resolve();
+              }
+            }, 220);
+            // allow cancel via cancelUpload which sets window.__cancelUpload = true
+            window.__cancelUpload = false;
+            const checkCancel = setInterval(() => {
+              if (window.__cancelUpload) {
+                clearInterval(id);
+                clearInterval(checkCancel);
+                reject(new Error('Upload cancelled by user'));
+              }
+            }, 150);
+          }).finally(() => { document.getElementById('cancel-upload').classList.add('hidden'); });
+        } else {
+          statusText.textContent = '2/4 Uploading directly to GCP Cloud Storage...';
+          document.getElementById('cancel-upload').classList.remove('hidden');
+
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            window.__currentXhr = xhr;
+            xhr.open('PUT', prepData.upload_url, true);
+            xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const pct = ((e.loaded / e.total) * 100).toFixed(0);
+                progressBar.style.width = pct + '%';
+                statusText.textContent = `2/4 Uploading directly to GCP Storage: ${pct}%`;
+              }
+            };
+            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
+            xhr.onerror = () => reject(new Error('Network error during GCS upload'));
+            xhr.send(file);
+          }).finally(() => { document.getElementById('cancel-upload').classList.add('hidden'); window.__currentXhr = null; });
+        }
 
         // 3. Confirm Upload & Transcribe
         statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
-        await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+        if (!isMock) {
+          await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+        } else {
+          // simulate server-side confirm in dry-run
+          await new Promise(r => setTimeout(r, 500));
+        }
 
         statusText.textContent = '4/4 Transcribing & extracting action items with Groq...';
-        const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
-        if (!transRes.ok) throw new Error(await transRes.text());
-        const transData = await transRes.json();
+        let transData;
+        if (!isMock) {
+          const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
+          if (!transRes.ok) throw new Error(await transRes.text());
+          transData = await transRes.json();
+        } else {
+          // Simulated extraction payload for dry-run so UI can render
+          transData = { review: { payload: { summary: 'Simulated extraction (dry-run).', items: [ { action_title: 'Follow up with engineering on deployment', quote_provenance: '"We will deploy next week"', classification: 'EXPLICIT_COMMITMENT', github_assignee_login: '', priority: 'MEDIUM' } ] } } };
+          await new Promise(r => setTimeout(r, 600));
+        }
 
         statusText.textContent = '✅ Extraction Complete!';
         activeMeetingId = prepData.meeting_id;
         renderReviewCards(transData.review ? transData.review.payload : null);
-
+        document.getElementById('reset-upload').classList.remove('hidden');
       } catch (err) {
         statusText.textContent = `❌ Upload failed: ${err.message}`;
         progressBar.style.background = '#EF4444';
@@ -482,6 +566,45 @@
         `;
         list.appendChild(box);
       });
+    }
+
+    // Helpers: preview, cancel, reset
+    function showPreview(file) {
+      const container = document.getElementById('preview-container');
+      container.innerHTML = '';
+      const type = file.type || '';
+      if (type.startsWith('video/')) {
+        const v = document.createElement('video');
+        v.controls = true; v.width = 480; v.style.borderRadius = '8px';
+        v.src = URL.createObjectURL(file);
+        container.appendChild(v);
+      } else if (type.startsWith('audio/')) {
+        const a = document.createElement('audio');
+        a.controls = true; a.src = URL.createObjectURL(file);
+        container.appendChild(a);
+      } else {
+        const p = document.createElement('div');
+        p.textContent = 'No preview available for this file type.';
+        container.appendChild(p);
+      }
+    }
+
+    function cancelUpload() {
+      window.__cancelUpload = true;
+      if (window.__currentXhr) try { window.__currentXhr.abort(); } catch(e){}
+      document.getElementById('status-text').textContent = '❌ Upload cancelled.';
+      document.getElementById('cancel-upload').classList.add('hidden');
+      document.getElementById('reset-upload').classList.remove('hidden');
+    }
+
+    function resetUI() {
+      window.__cancelUpload = false;
+      document.getElementById('file-info').textContent = '';
+      document.getElementById('preview-container').innerHTML = '';
+      document.getElementById('progress-container').style.display = 'none';
+      document.getElementById('progress-bar').style.width = '0%';
+      document.getElementById('status-text').textContent = '';
+      document.getElementById('reset-upload').classList.add('hidden');
     }
   </script>
 </body>

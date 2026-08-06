@@ -229,6 +229,16 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/config")
+def get_config():
+    """Return a small public configuration payload for the UI to validate uploads."""
+    try:
+        max_bytes = int(os.getenv("MEDIA_MAX_UPLOAD_BYTES", "524288000"))
+    except ValueError:
+        max_bytes = 524288000
+    return {"media_max_upload_bytes": max_bytes}
+
+
 @app.get("/upload-ui", response_class=HTMLResponse)
 @app.get("/ui", response_class=HTMLResponse)
 def get_upload_ui():

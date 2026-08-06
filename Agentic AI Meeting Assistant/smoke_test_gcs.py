@@ -52,24 +52,59 @@ if missing_any_required:
     print("❌ FAIL: GCP_PROJECT_ID and GCS_MEDIA_BUCKET are required. Fix .env and re-run.")
     sys.exit(1)
 
+# Support a dry-run / placeholder mode so CI and local developers can run the smoke test
+# without providing real GCP credentials. If DRY_RUN=true or the required vars look
+# like the example placeholders (start with "your-"), a MockGCSMediaStore is used.
 from src.media import GCSMediaStore, build_object_key
 
-try:
-    store = GCSMediaStore()
-except Exception as exc:
-    print(f"❌ GCSMediaStore init failed: {type(exc).__name__}: {exc}")
-    print()
-    print("Hint for Mode B users:")
-    print("  1. Run  gcloud auth application-default login  (once, in your PowerShell)")
-    print("  2. Confirm ADC file exists at:")
-    adc = Path(os.environ.get("APPDATA", "")) / "gcloud" / "application_default_credentials.json"
-    print(f"     {adc}   exists={adc.exists()}")
-    sys.exit(2)
+# Decide whether to use a mock store
+dry_run_env = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
+placeholders = any(os.getenv(k, "").startswith("your-") for k in ("GCP_PROJECT_ID", "GCS_MEDIA_BUCKET"))
+use_mock = dry_run_env or placeholders
+
+if use_mock:
+    print("Dry-run mode detected: using MockGCSMediaStore (no GCP calls will be made)")
+
+    class MockGCSMediaStore:
+        def __init__(self, bucket_name: str | None = None, project_id: str | None = None, service_account_email: str | None = None, client=None):
+            self.bucket_name = bucket_name or os.getenv("GCS_MEDIA_BUCKET") or "mock-bucket"
+            self.service_account_email = service_account_email or os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
+
+        @property
+        def signed_url_ttl(self):
+            from datetime import timedelta
+
+            return timedelta(minutes=15)
+
+        def create_upload_url(self, object_key: str, content_type: str) -> str:
+            # Return a non-functional but well-formed URL for testing display and length
+            return f"https://example.invalid/{self.bucket_name}/{object_key}?upload=1&content_type={content_type}"
+
+        def create_read_url(self, object_key: str) -> str:
+            return f"https://example.invalid/{self.bucket_name}/{object_key}?read=1"
+
+        def exists(self, object_key: str) -> bool:
+            return False
+
+    store = MockGCSMediaStore()
+else:
+    try:
+        store = GCSMediaStore()
+    except Exception as exc:
+        print(f"❌ GCSMediaStore init failed: {type(exc).__name__}: {exc}")
+        print()
+        print("Hint for Mode B users:")
+        print("  1. Run  gcloud auth application-default login  (once, in your PowerShell)")
+        print("  2. Confirm ADC file exists at:")
+        adc = Path(os.environ.get("APPDATA", "")) / "gcloud" / "application_default_credentials.json"
+        print(f"     {adc}   exists={adc.exists()}")
+        sys.exit(2)
+
 
 test_key = build_object_key("smoke-test-meeting", "recording.mp4")
 print(f"Test object key:   {test_key}")
 print(f"Bucket:            {store.bucket_name}")
-print(f"SA email for sign: {store.service_account_email or '(using local key)'}")
+print(f"SA email for sign: {getattr(store, 'service_account_email', None) or '(using local key)'}")
 print()
 
 try:
