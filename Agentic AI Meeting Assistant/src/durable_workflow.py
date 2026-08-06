@@ -46,6 +46,7 @@ def _review_view(item: dict[str, Any]) -> dict[str, Any]:
         "speaker_name": item["speaker_name"],
         "classification": item["classification"],
         "proposed_owner_name": item.get("proposed_owner_name"),
+        "final_owner_name": item.get("final_owner_name"),
         "owner_explicitly_accepted": item["owner_explicitly_accepted"],
         "due_date": item.get("resolved_due_date"),
         "priority": item["priority"],
@@ -53,6 +54,7 @@ def _review_view(item: dict[str, Any]) -> dict[str, Any]:
         "quote_provenance": item["quote_provenance"],
         "extraction_reason": item["extraction_reason"],
         "review_status": item["review_status"],
+        "reviewed_by": item.get("reviewed_by"),
     }
 
 
@@ -98,6 +100,7 @@ def review_candidate(
     priority: str | None = None,
     resolved_due_date: str | None = None,
     github_assignee_login: str | None = None,
+    final_owner_name: str | None = None,
 ) -> dict[str, Any]:
     item = repository.get_one("action_items", action_item_id)
     if not item or item["meeting_id"] != meeting_id:
@@ -123,6 +126,8 @@ def review_candidate(
         changes["resolved_due_date"] = resolved_due_date
     if github_assignee_login:
         changes["github_assignee_login"] = github_assignee_login
+    if final_owner_name:
+        changes["final_owner_name"] = final_owner_name.strip()
 
     if decision == "APPROVED":
         changes.update({"review_status": "APPROVED", "dispatch_status": "PENDING", "reviewed_by": reviewer_name, "reviewed_at": _now()})
@@ -130,6 +135,13 @@ def review_candidate(
         changes.update({"review_status": "REJECTED", "dispatch_status": "NOT_ELIGIBLE", "reviewed_by": reviewer_name, "reviewed_at": _now()})
     elif decision == "REEXTRACTION_REQUESTED":
         changes.update({"review_status": "REEXTRACTION_REQUESTED", "dispatch_status": "NOT_READY", "reviewed_by": reviewer_name, "reviewed_at": _now()})
+    elif decision == "EDITED":
+        changes.update({
+            "review_status": "PENDING_REVIEW",
+            "dispatch_status": "NOT_READY",
+            "reviewed_by": reviewer_name,
+            "reviewed_at": _now(),
+        })
 
     updated = repository.update("action_items", action_item_id, changes) if changes else item
     repository.insert("action_item_reviews", {

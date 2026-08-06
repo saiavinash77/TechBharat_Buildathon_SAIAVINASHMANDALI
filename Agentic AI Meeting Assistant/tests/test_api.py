@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+import main
 from main import app
 
 
@@ -20,3 +21,27 @@ def test_ingest_pauses_at_a_native_review_interrupt_without_model_credentials():
     assert response.status_code == 200
     assert response.json()["status"] == "waiting_for_review"
     assert response.json()["review"]["type"] == "review_required"
+
+
+def test_ingest_returns_graceful_extraction_failed_status_without_crashing(monkeypatch):
+    """If the graph ends without reaching the LangGraph interrupt (no review payload)
+    the endpoint must not IndexError. A descriptive status is returned instead."""
+
+    class FakeSnapshot:
+        tasks = []           # simulate graph that ran to END with no interrupt
+        values = {"error": None}
+        next_config = None
+
+    monkeypatch.setattr(main.graph, "get_state", lambda _config: FakeSnapshot())
+
+    resp = TestClient(app).post("/ingest", json={
+        "transcript": "Alpha bravo charlie delta.",
+        "meeting_date": "2026-08-06",
+        "meeting_id": "fail-safe-test",
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "extraction_failed"
+    assert body["thread_id"] == "fail-safe-test"
+    assert "Extraction did not produce reviewable candidates" in body["error"]
+

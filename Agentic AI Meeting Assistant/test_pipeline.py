@@ -7,11 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 os.makedirs("data", exist_ok=True)
 
-from src.models import init_db
 from src.graph import graph
 from src.state import AgentState
-
-init_db()
 
 
 def load_sample() -> str:

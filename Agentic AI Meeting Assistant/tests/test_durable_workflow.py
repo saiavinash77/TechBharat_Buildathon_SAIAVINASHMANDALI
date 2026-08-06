@@ -85,3 +85,36 @@ def test_approved_explicit_commitment_can_store_a_verified_login():
 
     assert reviewed["review_status"] == "APPROVED"
     assert repository.tables["action_item_reviews"][0]["decision"] == "APPROVED"
+
+
+def test_edited_decision_updates_fields_and_leaves_item_reviewable():
+    """An EDIT does NOT lock the item; it must remain re-reviewable in PENDING_REVIEW
+    state, and edits like final_owner_name must actually persist."""
+    repository = FakeRepository()
+    stored = persist_candidates(repository, "meeting-1", "thread-1", [explicit_candidate()])[0]
+
+    edited = review_candidate(
+        repository, "meeting-1", stored["id"],
+        reviewer_name="Editor", decision="EDITED",
+        final_title="Publish the demo BEFORE Friday",
+        final_owner_name="Asha Sharma",
+        priority="MEDIUM",
+        note="Changed due date and owner to match meeting consensus.",
+    )
+
+    assert edited["title"] == "Publish the demo BEFORE Friday"
+    assert edited["priority"] == "MEDIUM"
+    assert edited["final_owner_name"] == "Asha Sharma"
+    assert edited["review_status"] == "PENDING_REVIEW"  # still re-reviewable, not bricked
+    assert edited["reviewed_by"] == "Editor"
+
+    raw_row = repository.get_one("action_items", stored["id"])
+    assert raw_row["final_title"] == "Publish the demo BEFORE Friday"
+    assert raw_row["final_owner_name"] == "Asha Sharma"
+    assert raw_row["reviewed_by"] == "Editor"
+
+    review_row = repository.tables["action_item_reviews"][-1]
+    assert review_row["decision"] == "EDITED"
+    assert review_row["reviewer_name"] == "Editor"
+    assert review_row["reviewer_note"] == "Changed due date and owner to match meeting consensus."
+
