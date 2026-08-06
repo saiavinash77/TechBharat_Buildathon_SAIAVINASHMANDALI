@@ -51,6 +51,11 @@
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
     .result { padding: .6rem .8rem; border-radius: 8px; margin-bottom: .4rem; background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.35); font-size: .88rem; }
     .warn { color: #fcd34d; font-size: .8rem; margin-top: .25rem; }
+    .hint { color: #6ee7b7; font-size: .75rem; margin-top: .15rem; }
+    .qa-box { display: flex; gap: .5rem; margin-top: .75rem; flex-wrap: wrap; }
+    .qa-box input { flex: 1; min-width: 200px; }
+    .qa-answer { margin-top: .75rem; padding: .75rem; background: rgba(15,23,42,.6); border-radius: 8px; font-size: .9rem; line-height: 1.5; white-space: pre-wrap; }
+    .dry-banner { background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.4); color: #fcd34d; padding: .5rem .75rem; border-radius: 8px; font-size: .85rem; margin-top: .5rem; }
   </style>
 </head>
 <body>
@@ -58,6 +63,7 @@
     <div class="card">
       <h1>Agentic AI Meeting Assistant</h1>
       <p class="sub">Safety-first agent: AI proposes action items with evidence — you approve — then GitHub issues are created. Zero unapproved side effects.</p>
+      <div id="dry-run-banner" class="dry-banner hidden">DRY RUN is on — dispatch will preview only. Set <code>DRY_RUN=false</code> in .env for live GitHub issues.</div>
     </div>
 
     <div class="card">
@@ -100,6 +106,16 @@
         <div class="meta" id="risks-box"><strong>Risks / blockers</strong><ul id="risks-list"></ul></div>
       </div>
       <div id="items-list"></div>
+
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <h3 style="margin-bottom:.5rem;font-size:1rem">Ask about this meeting</h3>
+        <p class="sub" style="margin-bottom:.5rem">Evidence-backed answers from the transcript only.</p>
+        <div class="qa-box">
+          <input id="qa-input" type="text" placeholder="e.g. What did Rahul commit to?">
+          <button class="btn btn-primary btn-sm" onclick="askQuestion()">Ask</button>
+        </div>
+        <div id="qa-answer" class="qa-answer hidden"></div>
+      </div>
     </div>
 
     <div id="results-section" class="card hidden">
@@ -113,6 +129,12 @@
     let meetingId = null;
     let items = [];
     const REVIEWER = 'Demo Reviewer';
+
+    fetch('/health').then(r => r.json()).then(h => {
+      if (h.dry_run === true || h.dry_run === 'true') {
+        document.getElementById('dry-run-banner').classList.remove('hidden');
+      }
+    }).catch(() => {});
 
     document.querySelectorAll('.tab').forEach(btn => {
       btn.onclick = () => {
@@ -135,6 +157,8 @@
       fillList('risks-list', payload.risks_or_blockers || []);
       renderItems();
       document.getElementById('results-section').classList.add('hidden');
+      document.getElementById('qa-answer').classList.add('hidden');
+      document.getElementById('qa-input').value = '';
     }
 
     function fillList(id, arr) {
@@ -163,6 +187,9 @@
         div.id = 'item-' + item.id;
         const statusBadge = item.review_status === 'APPROVED' ? '<span class="badge b-approved">Approved</span>'
           : item.review_status === 'REJECTED' ? '<span class="badge b-rejected">Rejected</span>' : '';
+        const ghLogin = item.github_assignee_login || item.suggested_github_login || '';
+        const ghHint = item.suggested_github_login && !item.github_assignee_login
+          ? `<div class="hint">Roster match: @${escapeHtml(item.suggested_github_login)}</div>` : '';
         div.innerHTML = `
           <div class="item-head">
             <strong>${idx + 1}. ${escapeHtml(item.title)}</strong>
@@ -172,7 +199,7 @@
           <div class="sub">Speaker: ${escapeHtml(item.speaker_name || '?')} · Confidence: ${item.confidence_score ?? '—'}</div>
           ${item.classification === 'DISCUSSION_ONLY' ? '<div class="warn">Blocked from GitHub — discussion only</div>' : ''}
           <div class="fields">
-            <div><label>GitHub assignee (explicit only)</label><input id="gh-${item.id}" value="${escapeHtml(item.github_assignee_login || '')}" placeholder="github-username"></div>
+            <div><label>GitHub assignee (explicit only)</label><input id="gh-${item.id}" value="${escapeHtml(ghLogin)}" placeholder="github-username">${ghHint}</div>
             <div><label>Owner name</label><input id="owner-${item.id}" value="${escapeHtml(item.final_owner_name || item.proposed_owner_name || '')}"></div>
             <div><label>Priority</label><select id="pri-${item.id}"><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select></div>
             <div><label>Due date</label><input type="date" id="due-${item.id}" value="${item.due_date || ''}"></div>
@@ -312,6 +339,25 @@
         const dry = r.dry_run || (r.result && r.result.dry_run);
         return `<div class="result"><strong>${escapeHtml(r.title || r.action_item_id)}</strong> — ${r.status}${dry ? ' (DRY RUN — set DRY_RUN=false for live issues)' : ''}${url ? ` <a href="${url}" target="_blank" style="color:#93c5fd">View</a>` : ''}</div>`;
       }).join('');
+    }
+
+    async function askQuestion() {
+      if (!meetingId) return alert('Analyze a meeting first.');
+      const question = document.getElementById('qa-input').value.trim();
+      if (!question) return;
+      const box = document.getElementById('qa-answer');
+      box.classList.remove('hidden');
+      box.textContent = 'Thinking...';
+      const res = await fetch('/meetings/' + meetingId + '/ask', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        box.textContent = 'Error: ' + (data.detail || 'Q&A failed');
+        return;
+      }
+      box.textContent = data.answer;
     }
 
     async function loadAudit() {

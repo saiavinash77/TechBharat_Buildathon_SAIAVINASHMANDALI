@@ -33,12 +33,15 @@ Ingest (text | .vtt/.srt | audio/video)
 - **NEEDS_CONFIRMATION** → unassigned issue + `needs-confirmation` label
 - **DISCUSSION_ONLY** → blocked from GitHub
 
-## Deferred (not for 15hr demo)
-- Next.js frontend
+## Deferred (post-buildathon)
+- Next.js org dashboard
 - Cross-meeting RAG / memory
-- Slack/Jira/Linear integrations
-- Live meeting mode
+- Jira / email integrations
+- Google Meet auto-ingest
 - Chainlit (dev-only; demo uses `/ui`)
+
+## Optional demo add-on
+- Slack webhook recap (`SLACK_WEBHOOK_URL`) — already wired in dispatch
 
 ## Run
 ```powershell

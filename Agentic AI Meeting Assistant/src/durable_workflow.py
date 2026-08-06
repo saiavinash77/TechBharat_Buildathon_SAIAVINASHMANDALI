@@ -40,7 +40,15 @@ def _candidate_payload(item: ActionItem) -> dict[str, Any]:
     }
 
 
+def _suggested_github_login(item: dict[str, Any]) -> str | None:
+    if item.get("github_assignee_login"):
+        return item["github_assignee_login"]
+    snapshot = item.get("original_snapshot") or {}
+    return snapshot.get("suggested_github_login")
+
+
 def _review_view(item: dict[str, Any]) -> dict[str, Any]:
+    suggested = _suggested_github_login(item)
     return {
         "id": item["id"],
         "title": item["final_title"],
@@ -56,7 +64,8 @@ def _review_view(item: dict[str, Any]) -> dict[str, Any]:
         "extraction_reason": item["extraction_reason"],
         "review_status": item["review_status"],
         "reviewed_by": item.get("reviewed_by"),
-        "github_assignee_login": item.get("github_assignee_login"),
+        "suggested_github_login": suggested,
+        "github_assignee_login": item.get("github_assignee_login") or suggested,
         "dispatch_status": item.get("dispatch_status"),
     }
 

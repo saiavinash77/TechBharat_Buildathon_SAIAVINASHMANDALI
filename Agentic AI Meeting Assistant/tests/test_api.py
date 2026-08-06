@@ -10,7 +10,7 @@ def test_health_endpoint_is_available_without_model_credentials():
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert "dry_run" in body
+    assert isinstance(body["dry_run"], bool)
 
 
 def test_ingest_pauses_at_review_interrupt_without_model_credentials():
@@ -49,3 +49,16 @@ def test_ingest_returns_error_when_extraction_produces_no_candidates(monkeypatch
     })
     assert resp.status_code == 502
     assert "reviewable candidates" in resp.json()["detail"]
+
+
+def test_ask_meeting_requires_existing_meeting(monkeypatch):
+    class FakeRepo:
+        def get_one(self, table, record_id):
+            return None
+
+    monkeypatch.setattr(main, "InsForgeRepository", FakeRepo)
+    monkeypatch.setattr(main, "answer_meeting_question", lambda t, q: "Answer")
+
+    resp = TestClient(app).post("/meetings/nonexistent-id/ask", json={"question": "Who owns the API?"})
+    assert resp.status_code == 404
+

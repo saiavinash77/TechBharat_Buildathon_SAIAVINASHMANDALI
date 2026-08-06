@@ -1,83 +1,88 @@
 # TechBharat Buildathon — Agentic AI Meeting Assistant
 
-> A safety-first workflow that turns meeting evidence into reviewer-approved GitHub issues. AI proposes tasks; it never creates accountability by itself.
+> AI proposes meeting commitments with evidence. You approve each one. Then GitHub issues are created. Zero unapproved side effects.
 
-## Architecture
-
-![Safety-first meeting assistant architecture](docs/architecture.svg)
-
-## What lives where
-
-| Service | Responsibility |
-|---|---|
-| GCP Cloud Storage | Private raw audio/video objects and short-lived signed upload URLs. |
-| Groq | Speech-to-text with timestamp evidence, plus structured extraction and current-meeting Q&A. |
-| LangGraph | Agent workflow: extract, validate, native reviewer interrupt, and resume. |
-| InsForge | Media metadata, transcript segments, action items, reviews, workflow state, and audit records. |
-| GitHub | The destination for only reviewer-approved eligible issues. |
-
-## Accountability policy
-
-| Classification | GitHub outcome |
-|---|---|
-| `EXPLICIT_COMMITMENT` | The speaker directly accepted the work. After review, an issue may be assigned only when a verified GitHub login is supplied. |
-| `NEEDS_CONFIRMATION` | A request or unclear ownership. After review, create an unassigned issue with `needs-confirmation`. |
-| `DISCUSSION_ONLY` | An idea, question, or discussion. It is blocked from GitHub. |
-
-## Run locally
+## Quick start (demo)
 
 ```powershell
+cd "Agentic AI Meeting Assistant"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pytest -q
-Copy-Item .env.example .env
+pip install -r requirements.txt
+Copy-Item .env.example .env   # fill in keys (see BUILD_PLAN.md)
 uvicorn main:app --reload
 ```
 
-For the Chainlit UI:
+Open **http://localhost:8000/ui**
 
-```powershell
-chainlit run app.py
-```
+Follow the step-by-step demo script in **`DEMO.md`**.
 
-Configure `.env` with server-only credentials. Do not commit it.
+## What the demo does
+
+1. Paste or upload a meeting transcript (`.txt`, `.vtt`, `.srt`, or audio/video)
+2. AI extracts summary, decisions, risks, and action items with quote evidence
+3. You **approve or reject each item individually**
+4. Dispatch creates GitHub issues (sandbox repo)
+5. Optional Slack recap if `SLACK_WEBHOOK_URL` is set
+6. Re-run → no duplicate issues (idempotent)
+
+## Required `.env` for live demo
 
 ```text
-INSFORGE_URL=https://...
-INSFORGE_API_KEY=...
 GROQ_API_KEY=...
-GCP_PROJECT_ID=...
-GCS_MEDIA_BUCKET=...
-GOOGLE_APPLICATION_CREDENTIALS=C:\path\service-account.json
-DRY_RUN=true
+INSFORGE_URL=...
+INSFORGE_API_KEY=...
+DRY_RUN=false
+GITHUB_TOKEN=...
+GITHUB_REPO=owner/sandbox-repo
 ```
 
-## Media flow
+Optional: `SLACK_WEBHOOK_URL=...`
 
-The UI accepts supported media files up to 100 MB. The API supports signed uploads up to the configurable 500 MB limit:
+See **`BUILD_PLAN.md`** for setup checklist.
 
-1. `POST /media/uploads` with title, meeting date, filename, MIME type, and byte size.
-2. Upload bytes to the returned GCS `upload_url` via `PUT`, using the returned `Content-Type` header.
-3. `POST /media/{media_id}/confirm-upload`.
-4. `POST /media/{media_id}/transcribe`.
-5. Review each persisted candidate with `POST /meetings/{meeting_id}/action-items/{action_item_id}/review`.
-6. When ready, explicitly call `POST /meetings/{meeting_id}/dispatch`.
+## Architecture
 
-The fourth call transcribes the private object, records timestamped segments and extracted candidates in InsForge, then enters the LangGraph review gate. The review endpoint records the original AI proposal and reviewer decision before dispatch is possible. Raw media remains private in GCS; InsForge stores only the object key and durable workflow data.
+```
+Ingest → Groq (STT if media) → LangGraph extract → resolve roster/dates
+  → persist candidates → /ui review → dispatch → GitHub (+ Slack)
+  → audit log in InsForge
+```
+
+Full product roadmap: **`PLAN.md`**
+
+## API (main endpoints)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /ingest` | Paste text transcript |
+| `POST /ingest/file` | Upload `.txt` / `.vtt` / `.srt` |
+| `POST /media/*` | Audio/video upload + transcribe |
+| `POST /meetings/{id}/action-items/{id}/review` | Approve / reject item |
+| `POST /meetings/{id}/dispatch` | Create approved GitHub issues |
+| `POST /meetings/{id}/ask` | Q&A over transcript |
+| `GET /meetings/{id}` | Audit log |
+| `GET /ui` | Demo UI |
+
+## Team roster
+
+Edit `data/team_members.json` to map spoken names → GitHub logins. Used during owner resolution and pre-filled in the review UI.
+
+## Tests & eval
+
+```powershell
+python -m pytest -q
+python eval_gold.py   # needs GROQ_API_KEY
+```
 
 ## Scope
 
-Included now: transcript input, private audio/video uploads, transcription, timestamp evidence, strict commitment classification, reviewer interrupt, current-meeting Q&A, safe GitHub dispatch, and InsForge workflow tables.
+**In scope now:** Individual mode, human review gate, GitHub dispatch, optional Slack recap, Q&A.
 
-Deferred: cross-meeting RAG, Slack/Jira/Linear/email integrations, automatic speaker identity, and video-vision analysis.
+**Post-buildathon:** Organization mode, Jira, email, Google Meet auto-ingest. See `PLAN.md`.
 
 ## InsForge
 
-The linked InsForge project holds durable application records. Use its CLI through:
+Project backend: `https://cgjubsx4.ap-southeast.insforge.app`
 
-```powershell
-npx -y @insforge/cli current
-```
-
-Never commit `.insforge/project.json`, API keys, service-account files, or other credentials.
+Never commit `.env`, API keys, or service account files.

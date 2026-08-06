@@ -15,6 +15,7 @@ from src.media import MediaConfigurationError, GCSMediaStore
 from src.media_workflow import confirm_upload, create_upload, transcribe_media
 from src.state import AgentState
 from src.transcript_parser import parse_transcript_file
+from src.meeting_qa import answer_meeting_question
 
 load_dotenv()
 
@@ -64,6 +65,10 @@ class MediaUploadRequest(BaseModel):
     filename: str
     content_type: str
     size_bytes: int
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
 
 
 def _media_error(error: Exception) -> HTTPException:
@@ -158,6 +163,20 @@ def review(req: ReviewRequest):
     config = {"configurable": {"thread_id": req.thread_id}}
     result = graph.invoke(Command(resume=req.decision.model_dump()), config)
     return {"status": "completed", "thread_id": req.thread_id, "result": result}
+
+
+@app.post("/meetings/{meeting_id}/ask")
+def ask_about_meeting(meeting_id: str, req: AskRequest):
+    """Evidence-backed Q&A over the stored meeting transcript."""
+    try:
+        repository = InsForgeRepository()
+        meeting = repository.get_one("meetings", meeting_id)
+        if not meeting:
+            raise LookupError("Meeting not found.")
+        answer = answer_meeting_question(meeting.get("transcript_text") or "", req.question)
+        return {"meeting_id": meeting_id, "question": req.question, "answer": answer}
+    except Exception as error:
+        raise _media_error(error) from error
 
 
 @app.get("/meetings/{meeting_id}")
@@ -268,7 +287,8 @@ def dispatch_meeting_candidates(meeting_id: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "dry_run": __import__("os").getenv("DRY_RUN", "true")}
+    import os
+    return {"status": "ok", "dry_run": os.getenv("DRY_RUN", "true").lower() == "true"}
 
 
 @app.get("/upload-ui", response_class=HTMLResponse)
