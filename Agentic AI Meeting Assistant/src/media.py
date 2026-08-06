@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import subprocess
 from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
+from google.auth.transport.requests import Request
 from google.cloud import storage
 
 
@@ -79,8 +82,8 @@ class GCSMediaStore:
         if not self.bucket_name:
             raise MediaConfigurationError("GCS_MEDIA_BUCKET is required for media uploads.")
         self.service_account_email = service_account_email or os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
-        resolved_project = project_id or os.getenv("GCP_PROJECT_ID")
-        self.client = client or storage.Client(project=resolved_project)
+        self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
+        self.client = client or storage.Client(project=self.project_id)
         self.bucket = self.client.bucket(self.bucket_name)
 
     @property
@@ -92,9 +95,67 @@ class GCSMediaStore:
         return timedelta(minutes=max(1, min(minutes, 60)))
 
     def _signing_kwargs(self) -> dict[str, str]:
-        if self.service_account_email:
+        if not self.service_account_email:
+            return {}
+ 
+        credentials = getattr(self.client, "_credentials", None)
+        if credentials is None:
             return {"service_account_email": self.service_account_email}
-        return {}
+ 
+        if hasattr(credentials, "sign_bytes"):
+            return {"service_account_email": self.service_account_email}
+ 
+        if not getattr(credentials, "token", None) or getattr(credentials, "expired", False):
+            request = Request()
+            try:
+                credentials.refresh(request)
+            except Exception as error:
+                token = self._fetch_gcloud_access_token()
+                if token:
+                    return {
+                        "service_account_email": self.service_account_email,
+                        "access_token": token,
+                    }
+ 
+                raise MediaConfigurationError(
+                    "Unable to refresh GCP credentials for IAM signBlob signing. "
+                    "Run 'gcloud auth application-default login' and ensure the active user has "
+                    "iam.serviceAccounts.signBlob on the target service account."
+                ) from error
+ 
+        if not getattr(credentials, "token", None):
+            token = self._fetch_gcloud_access_token()
+            if token:
+                return {
+                    "service_account_email": self.service_account_email,
+                    "access_token": token,
+                }
+ 
+            raise MediaConfigurationError(
+                "Unable to obtain an access token for IAM signBlob signing. "
+                "Ensure application-default credentials are available and valid."
+            )
+ 
+        return {
+            "service_account_email": self.service_account_email,
+            "access_token": credentials.token,
+        }
+
+    def _fetch_gcloud_access_token(self) -> str | None:
+        if not shutil.which("gcloud"):
+            return None
+
+        command = ["gcloud", "auth", "application-default", "print-access-token"]
+        if self.project_id:
+            command.extend(["--project", self.project_id])
+
+        try:
+            output = subprocess.check_output(command, stderr=subprocess.STDOUT, text=True, timeout=30)
+            return output.strip()
+        except subprocess.CalledProcessError:
+            return None
+        except (FileNotFoundError, OSError):
+            return None
 
     def create_upload_url(self, object_key: str, content_type: str) -> str:
         try:
@@ -105,9 +166,13 @@ class GCSMediaStore:
                 content_type=content_type,
                 **self._signing_kwargs(),
             )
-        except Exception:
-            # Fallback for environments without local private RSA signing key
-            return f"https://storage.googleapis.com/{self.bucket_name}/{object_key}"
+        except Exception as error:
+            raise MediaConfigurationError(
+                "Unable to create a signed upload URL. Check that GCS_MEDIA_BUCKET, "
+                "GOOGLE_APPLICATION_CREDENTIALS or GCS_SERVICE_ACCOUNT_EMAIL are configured, "
+                "and if using Mode B, that your ADC user has iam.serviceAccounts.signBlob "
+                "permission on the specified service account."
+            ) from error
 
     def create_read_url(self, object_key: str) -> str:
         try:
@@ -117,9 +182,11 @@ class GCSMediaStore:
                 method="GET",
                 **self._signing_kwargs(),
             )
-        except Exception:
-            # Fallback for environments without local private RSA signing key
-            return f"https://storage.googleapis.com/{self.bucket_name}/{object_key}"
+        except Exception as error:
+            raise MediaConfigurationError(
+                "Unable to create a signed read URL. Ensure your GCS credentials are valid "
+                "and the signing configuration is correct."
+            ) from error
 
     def upload_file(self, object_key: str, file_path: str, content_type: str) -> None:
         """Upload a local file directly to private GCS storage using official SDK."""

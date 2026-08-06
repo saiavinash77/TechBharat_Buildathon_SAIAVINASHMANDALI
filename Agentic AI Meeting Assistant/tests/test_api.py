@@ -4,6 +4,15 @@ import main
 from main import app
 
 
+def test_empty_transcript_review_payload_is_helpful():
+    payload = main._build_empty_transcript_review_payload("meeting-123", "   ")
+
+    assert payload["type"] == "review_required"
+    assert payload["items"] == []
+    assert "No speech was detected" in payload["summary"]
+    assert payload["empty_reason"] == "empty_transcript"
+
+
 def test_health_endpoint_is_available_without_model_credentials():
     response = TestClient(app).get("/health")
 

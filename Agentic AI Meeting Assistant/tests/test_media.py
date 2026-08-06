@@ -36,3 +36,79 @@ def test_verbose_groq_response_preserves_timestamp_evidence():
     assert result.text == "I will prepare the demo."
     assert result.segments[0].index == 3
     assert result.segments[0].start_seconds == 1.2
+
+
+class DummyClient:
+    def __init__(self, credentials):
+        self._credentials = credentials
+        self.bucket = lambda name: None
+
+
+class SigningCredentials:
+    def __init__(self):
+        self.signer_email = "svc-account@project.iam.gserviceaccount.com"
+
+    def sign_bytes(self, value):
+        return b"dummy-signature"
+
+
+class RefreshCredentials:
+    def __init__(self):
+        self.token = None
+        self.expired = True
+        self.refreshed = False
+
+    def refresh(self, request):
+        self.token = "refreshed-token"
+        self.expired = False
+        self.refreshed = True
+
+
+class RefreshFailsCredentials(RefreshCredentials):
+    def refresh(self, request):
+        raise RuntimeError("refresh failed")
+
+
+def test_signing_kwargs_uses_local_signer_when_available():
+    from src.media import GCSMediaStore
+
+    credentials = SigningCredentials()
+    client = DummyClient(credentials)
+    store = GCSMediaStore(bucket_name="test-bucket", project_id="test-project", service_account_email="svc-account@project.iam.gserviceaccount.com", client=client)
+
+    assert store._signing_kwargs() == {"service_account_email": "svc-account@project.iam.gserviceaccount.com"}
+
+
+def test_signing_kwargs_refreshes_token_for_user_adc():
+    from src.media import GCSMediaStore
+
+    credentials = RefreshCredentials()
+    client = DummyClient(credentials)
+    store = GCSMediaStore(bucket_name="test-bucket", project_id="test-project", service_account_email="svc-account@project.iam.gserviceaccount.com", client=client)
+
+    kwargs = store._signing_kwargs()
+
+    assert kwargs == {
+        "service_account_email": "svc-account@project.iam.gserviceaccount.com",
+        "access_token": "refreshed-token",
+    }
+    assert credentials.refreshed is True
+
+
+def test_signing_kwargs_uses_gcloud_access_token_fallback(monkeypatch):
+    import src.media as media
+    from src.media import GCSMediaStore
+
+    credentials = RefreshFailsCredentials()
+    client = DummyClient(credentials)
+    store = GCSMediaStore(bucket_name="test-bucket", project_id="test-project", service_account_email="svc-account@project.iam.gserviceaccount.com", client=client)
+
+    monkeypatch.setattr(media.shutil, 'which', lambda path: 'C:/Program Files/gcloud/bin/gcloud')
+    monkeypatch.setattr(media.subprocess, 'check_output', lambda args, stderr, text, timeout: 'gcloud-access-token')
+
+    kwargs = store._signing_kwargs()
+
+    assert kwargs == {
+        "service_account_email": "svc-account@project.iam.gserviceaccount.com",
+        "access_token": "gcloud-access-token",
+    }

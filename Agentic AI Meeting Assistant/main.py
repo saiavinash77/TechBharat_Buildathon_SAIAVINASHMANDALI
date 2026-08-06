@@ -1,5 +1,7 @@
+import os
 from datetime import date
 from pathlib import Path
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -114,12 +116,43 @@ def _media_error(error: Exception) -> HTTPException:
     return HTTPException(status_code=502, detail="Media processing failed. Check server logs for the provider error.")
 
 
+def _build_empty_transcript_review_payload(meeting_id: str, transcript: str) -> dict:
+    """Create a user-friendly review payload when the source media was empty or unintelligible."""
+    normalized = (transcript or "").strip()
+    if not normalized:
+        summary = "No speech was detected in the uploaded audio. Please upload a clearer recording or use the text transcript option."
+        reason = "empty_transcript"
+    elif len(normalized) < 30:
+        summary = "The transcript was too short to derive reliable action items. Please upload a clearer recording or paste a transcript manually."
+        reason = "short_transcript"
+    else:
+        summary = "No reviewable action items were detected from this transcript."
+        reason = "no_candidates"
+
+    return {
+        "type": "review_required",
+        "meeting_id": meeting_id,
+        "summary": summary,
+        "items": [],
+        "rules": {
+            "explicit_commitment": "May be assigned only when the speaker directly accepted it.",
+            "needs_confirmation": "May be sent to GitHub unassigned with needs-confirmation.",
+            "discussion_only": "Must not be sent to GitHub.",
+        },
+        "empty_reason": reason,
+    }
+
+
 def _start_media_review(media: dict, transcript: str) -> dict | None:
     """Immediately hand a completed transcript to the LangGraph review gate."""
     repository = InsForgeRepository()
     meeting = repository.get_one("meetings", media["meeting_id"])
     if not meeting:
         raise LookupError("Meeting metadata not found for this media file.")
+    normalized = (transcript or "").strip()
+    if not normalized or len(normalized) < 30:
+        return {"thread_id": f"meeting-{meeting['id']}", "payload": _build_empty_transcript_review_payload(meeting["meeting_key"], transcript)}
+
     thread_id = f"meeting-{meeting['id']}"
     config = {"configurable": {"thread_id": thread_id}}
     graph.invoke({

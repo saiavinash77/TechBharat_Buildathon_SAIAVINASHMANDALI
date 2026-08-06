@@ -66,6 +66,7 @@ The project supports two GCP auth modes for private Cloud Storage uploads:
   - Set `GCS_SERVICE_ACCOUNT_EMAIL` to the target service account email.
   - Run `gcloud auth application-default login` once on the host.
   - The logged-in user must have `iam.serviceAccounts.signBlob` on that service account.
+  - The app can also fall back to `gcloud auth application-default print-access-token` if standard ADC refresh paths fail.
 
 Also:
 
