@@ -117,11 +117,14 @@
       transition: all 0.2s;
       background: rgba(15, 23, 42, 0.4);
     }
-    .dropzone:hover {
+    .dropzone:hover, .dropzone:focus {
       border-color: var(--accent-purple);
       background: rgba(139, 92, 246, 0.1);
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(139,92,246,0.08);
     }
     .dropzone p { margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
     input[type="file"] { display: none; }
     textarea {
@@ -252,7 +255,8 @@
 
       <!-- Upload Tab -->
       <div id="tab-upload">
-        <div class="dropzone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+        <div class="dropzone" role="button" tabindex="0" aria-label="Upload media file" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)" onkeydown="if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); document.getElementById('file-input').click(); }">
+          <span class="sr-only">Press Enter or Space to open file picker. Also supports drag and drop.</span>
           <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📹</div>
           <h3>Drag & Drop Video / Audio File Here</h3>
           <p>Supports MP4, WebM, MP3, WAV, M4A up to 2 GB directly to GCP Storage</p>
@@ -277,6 +281,18 @@
           <button class="btn" onclick="submitTextTranscript()">🧠 Analyze Transcript</button>
         </div>
       </div>
+    </div>
+
+    <!-- Upload History -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+        <h2>📥 Recent Uploads</h2>
+        <div>
+          <button class="btn" onclick="renderUploadHistory()">Refresh</button>
+          <button class="btn btn-red" style="margin-left:0.5rem" onclick="clearUploadHistory()">Clear</button>
+        </div>
+      </div>
+      <div id="upload-history" style="max-height:220px;overflow:auto;padding-top:0.5rem;color:var(--text-main)">No uploads yet.</div>
     </div>
 
     <!-- Review Container -->
@@ -309,7 +325,7 @@
       return (n/(1024*1024*1024)).toFixed(2) + ' GB';
     }
 
-    // Fetch server config for upload limits
+    // Fetch server config for upload limits and mode
     (async function loadConfig(){
       try {
         const res = await fetch('/config');
@@ -321,6 +337,21 @@
             if (info && !info.textContent) {
               info.textContent = `Max upload: ${fmtBytes(MEDIA_MAX_UPLOAD_BYTES)}`;
             }
+          }
+          if (cfg && cfg.dry_run) {
+            const header = document.querySelector('header');
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.style.background = 'rgba(239,68,68,0.12)';
+            badge.textContent = 'DRY RUN';
+            header.appendChild(badge);
+          }
+          if (cfg && cfg.gcp_project_id) {
+            const header = document.querySelector('header');
+            const proj = document.createElement('span');
+            proj.className = 'badge';
+            proj.textContent = cfg.gcp_project_id;
+            header.appendChild(proj);
           }
         }
       } catch(e) {
@@ -457,8 +488,15 @@
 
         statusText.textContent = '✅ Extraction Complete!';
         activeMeetingId = prepData.meeting_id;
+        // Save to local upload history (non-secret)
+        try {
+          const hist = JSON.parse(localStorage.getItem('upload_history') || '[]');
+          hist.unshift({ meeting_id: prepData.meeting_id, media_id: prepData.media_id, filename: file.name, created_at: new Date().toISOString() });
+          localStorage.setItem('upload_history', JSON.stringify(hist.slice(0,50)));
+        } catch(e) { /* ignore */ }
         renderReviewCards(transData.review ? transData.review.payload : null);
         document.getElementById('reset-upload').classList.remove('hidden');
+        renderUploadHistory();
       } catch (err) {
         statusText.textContent = `❌ Upload failed: ${err.message}`;
         progressBar.style.background = '#EF4444';
@@ -566,6 +604,29 @@
         `;
         list.appendChild(box);
       });
+    }
+
+    // Upload history UI
+    function renderUploadHistory() {
+      const container = document.getElementById('upload-history');
+      if (!container) return;
+      const hist = JSON.parse(localStorage.getItem('upload_history') || '[]');
+      if (!hist.length) {
+        container.innerHTML = '<div style="color:var(--text-muted)">No uploads yet.</div>';
+        return;
+      }
+      container.innerHTML = '';
+      hist.forEach(h => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border-bottom:1px solid rgba(255,255,255,0.03)';
+        row.innerHTML = `<div><strong>${h.filename}</strong> <div style="font-size:0.85rem;color:var(--text-muted)">${h.created_at} • ${h.meeting_id}</div></div><div><button class="btn" style="padding:0.3rem 0.6rem;">Open</button></div>`;
+        container.appendChild(row);
+      });
+    }
+
+    function clearUploadHistory() {
+      localStorage.removeItem('upload_history');
+      renderUploadHistory();
     }
 
     // Helpers: preview, cancel, reset

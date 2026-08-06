@@ -236,7 +236,9 @@ def get_config():
         max_bytes = int(os.getenv("MEDIA_MAX_UPLOAD_BYTES", "524288000"))
     except ValueError:
         max_bytes = 524288000
-    return {"media_max_upload_bytes": max_bytes}
+    dry = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
+    project = os.getenv("GCP_PROJECT_ID") or None
+    return {"media_max_upload_bytes": max_bytes, "dry_run": dry, "gcp_project_id": project}
 
 
 @app.get("/upload-ui", response_class=HTMLResponse)
