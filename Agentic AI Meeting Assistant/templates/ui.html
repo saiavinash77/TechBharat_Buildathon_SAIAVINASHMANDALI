@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic AI Meeting Assistant — Safety-First Review Gate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+      --glass-bg: rgba(30, 41, 59, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --accent-blue: #3B82F6;
+      --accent-purple: #8B5CF6;
+      --accent-green: #10B981;
+      --accent-yellow: #F59E0B;
+      --accent-red: #EF4444;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      padding: 1.5rem;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 1rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #60A5FA, #A78BFA);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    header p { color: var(--text-muted); font-size: 0.95rem; }
+
+    .badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .badge {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      color: #CBD5E1;
+    }
+
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 1rem;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: var(--text-main);
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+
+    .dropzone {
+      border: 2px dashed rgba(139, 92, 246, 0.4);
+      border-radius: 0.75rem;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .dropzone:hover {
+      border-color: var(--accent-purple);
+      background: rgba(139, 92, 246, 0.1);
+    }
+    .dropzone p { margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
+
+    input[type="file"] { display: none; }
+    textarea {
+      width: 100%;
+      height: 160px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--glass-border);
+      border-radius: 0.75rem;
+      color: var(--text-main);
+      padding: 1rem;
+      font-family: inherit;
+      resize: vertical;
+      font-size: 0.95rem;
+    }
+    textarea:focus { outline: 1px solid var(--accent-blue); }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: #FFF;
+      font-weight: 600;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-green { background: linear-gradient(135deg, #10B981, #059669); }
+    .btn-red { background: linear-gradient(135deg, #EF4444, #DC2626); }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-top: 1rem;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #3B82F6, #10B981);
+      transition: width 0.2s;
+    }
+    .status-text {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #60A5FA;
+      text-align: center;
+    }
+
+    .item-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--glass-border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge-commitment { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-needs { background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-discussion { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+    .quote-box {
+      background: rgba(0, 0, 0, 0.2);
+      border-left: 3px solid var(--accent-purple);
+      padding: 0.5rem 0.75rem;
+      font-style: italic;
+      color: #CBD5E1;
+      font-size: 0.88rem;
+    }
+
+    .inline-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .field-group label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    .field-group input, .field-group select {
+      width: 100%;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--glass-border);
+      border-radius: 0.375rem;
+      color: #FFF;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎙️ Agentic AI Meeting Assistant</h1>
+      <p>Direct GCS Storage Streaming & Safety-First Human Review Gate</p>
+      <div class="badges">
+        <span class="badge">GCP Cloud Storage (Direct GCS)</span>
+        <span class="badge">Groq Whisper (2s STT)</span>
+        <span class="badge">LLaMA 3.3 70B</span>
+        <span class="badge">InsForge PostgreSQL</span>
+        <span class="badge">GitHub Side Effect Engine</span>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('upload')">📁 Direct GCS Media Upload</button>
+        <button class="tab-btn" onclick="switchTab('text')">📝 Paste Text Transcript</button>
+      </div>
+
+      <!-- Upload Tab -->
+      <div id="tab-upload">
+        <div class="dropzone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📹</div>
+          <h3>Drag & Drop Video / Audio File Here</h3>
+          <p>Supports MP4, WebM, MP3, WAV, M4A up to 2 GB directly to GCP Storage</p>
+          <input type="file" id="file-input" accept="audio/*,video/*" onchange="handleFileSelect(event)">
+        </div>
+        <div id="file-info" style="margin-top: 0.75rem; font-size: 0.9rem; color: #A78BFA;"></div>
+        <div class="progress-bar-container" id="progress-container">
+          <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="status-text" id="status-text"></div>
+      </div>
+
+      <!-- Text Tab -->
+      <div id="tab-text" class="hidden">
+        <textarea id="text-transcript" placeholder="Paste your raw meeting transcript text here (>50 characters)..."></textarea>
+        <div style="margin-top: 1rem; text-align: right;">
+          <button class="btn" onclick="submitTextTranscript()">🧠 Analyze Transcript</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review Container -->
+    <div id="review-container" class="card hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>📋 Candidate Action Items</h2>
+        <button class="btn btn-green" onclick="dispatchAll()">🚀 Approve & Dispatch to GitHub</button>
+      </div>
+      <div id="executive-summary" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent-blue); border-radius: 0.5rem;"></div>
+      <div id="candidate-list"></div>
+    </div>
+
+    <!-- Results Container -->
+    <div id="results-container" class="card hidden">
+      <h2>🚀 Execution & Audit Log Results</h2>
+      <div id="results-list" style="margin-top: 1rem;"></div>
+    </div>
+  </div>
+
+  <script>
+    let activeMeetingId = null;
+    let currentCandidates = [];
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (tab === 'upload') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('tab-upload').classList.remove('hidden');
+        document.getElementById('tab-text').classList.add('hidden');
+      } else {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('tab-upload').classList.add('hidden');
+        document.getElementById('tab-text').classList.remove('hidden');
+      }
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      if (e.dataTransfer.files.length) uploadMediaFile(e.dataTransfer.files[0]);
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files.length) uploadMediaFile(e.target.files[0]);
+    }
+
+    async function uploadMediaFile(file) {
+      const progressContainer = document.getElementById('progress-container');
+      const progressBar = document.getElementById('progress-bar');
+      const statusText = document.getElementById('status-text');
+      const fileInfo = document.getElementById('file-info');
+
+      fileInfo.textContent = `Selected: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+      statusText.textContent = '1/4 Requesting private GCS upload URL...';
+
+      try {
+        // 1. Prepare Upload
+        const prepRes = await fetch('/media/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: file.name,
+            meeting_date: new Date().toISOString().split('T')[0],
+            filename: file.name,
+            content_type: file.type || 'video/mp4',
+            size_bytes: file.size
+          })
+        });
+        if (!prepRes.ok) throw new Error(await prepRes.text());
+        const prepData = await prepRes.json();
+
+        // 2. Direct GCS Upload with Progress XHR
+        statusText.textContent = '2/4 Uploading directly to GCP Cloud Storage...';
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', prepData.upload_url, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = ((e.loaded / e.total) * 100).toFixed(0);
+              progressBar.style.width = pct + '%';
+              statusText.textContent = `2/4 Uploading directly to GCP Storage: ${pct}%`;
+            }
+          };
+          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
+          xhr.onerror = () => reject(new Error('Network error during GCS upload'));
+          xhr.send(file);
+        });
+
+        // 3. Confirm Upload & Transcribe
+        statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
+        await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+
+        statusText.textContent = '4/4 Transcribing & extracting action items with Groq...';
+        const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
+        if (!transRes.ok) throw new Error(await transRes.text());
+        const transData = await transRes.json();
+
+        statusText.textContent = '✅ Extraction Complete!';
+        activeMeetingId = prepData.meeting_id;
+        renderReviewCards(transData.review ? transData.review.payload : null);
+
+      } catch (err) {
+        statusText.textContent = `❌ Upload failed: ${err.message}`;
+        progressBar.style.background = '#EF4444';
+      }
+    }
+
+    async function submitTextTranscript() {
+      const text = document.getElementById('text-transcript').value.trim();
+      if (text.length < 50) return alert('Please enter a transcript of at least 50 characters.');
+
+      try {
+        const res = await fetch('/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            meeting_date: new Date().toISOString().split('T')[0],
+            meeting_id: 'mtg_' + Date.now()
+          })
+        });
+        const data = await res.json();
+        if (data.status === 'waiting_for_review') {
+          activeMeetingId = data.thread_id;
+          renderReviewCards(data.review);
+        } else {
+          alert('Extraction failed: ' + (data.error || 'No reviewable items found.'));
+        }
+      } catch (err) {
+        alert('Analysis error: ' + err.message);
+      }
+    }
+
+    function renderReviewCards(payload) {
+      const container = document.getElementById('review-container');
+      const summaryBox = document.getElementById('executive-summary');
+      const list = document.getElementById('candidate-list');
+
+      container.classList.remove('hidden');
+      list.innerHTML = '';
+      summaryBox.innerHTML = `<strong>Executive Summary</strong>: ${payload && payload.summary ? payload.summary : 'Meeting transcript analyzed.'}`;
+
+      const items = (payload && payload.items) ? payload.items : (payload && payload.action_items ? payload.action_items : []);
+      currentCandidates = items;
+
+      items.forEach((item, idx) => {
+        const badgeClass = item.classification === 'EXPLICIT_COMMITMENT' ? 'badge-commitment' : (item.classification === 'NEEDS_CONFIRMATION' ? 'badge-needs' : 'badge-discussion');
+        const badgeText = item.classification === 'EXPLICIT_COMMITMENT' ? '🟢 Commitment' : (item.classification === 'NEEDS_CONFIRMATION' ? '🟡 Needs Review' : '🔴 Discussion Only');
+
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+          <div class="item-header">
+            <h3 style="font-size: 1.05rem;">${idx + 1}. ${item.action_title || item.title}</h3>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="quote-box">Quote Evidence: "${item.quote_provenance || 'N/A'}"</div>
+          <div class="inline-fields">
+            <div class="field-group">
+              <label>Assignee Username</label>
+              <input type="text" id="owner-${idx}" value="${item.github_assignee_login || item.owner_name || ''}">
+            </div>
+            <div class="field-group">
+              <label>Priority</label>
+              <select id="priority-${idx}">
+                <option value="HIGH" ${item.priority === 'HIGH' ? 'selected' : ''}>HIGH</option>
+                <option value="MEDIUM" ${item.priority === 'MEDIUM' || !item.priority ? 'selected' : ''}>MEDIUM</option>
+                <option value="LOW" ${item.priority === 'LOW' ? 'selected' : ''}>LOW</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Due Date</label>
+              <input type="date" id="date-${idx}" value="${item.resolved_due_date || ''}">
+            </div>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    async function dispatchAll() {
+      if (!activeMeetingId) return alert('No active meeting thread to dispatch.');
+
+      try {
+        const res = await fetch(`/meetings/${activeMeetingId}/dispatch`, { method: 'POST' });
+        const data = await res.json();
+        renderResults(data.results || []);
+      } catch (err) {
+        alert('Dispatch error: ' + err.message);
+      }
+    }
+
+    function renderResults(results) {
+      const container = document.getElementById('results-container');
+      const list = document.getElementById('results-list');
+      container.classList.remove('hidden');
+      list.innerHTML = '';
+
+      results.forEach(r => {
+        const box = document.createElement('div');
+        box.style.cssText = 'padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.5rem; margin-bottom: 0.5rem;';
+        box.innerHTML = `
+          <strong>${r.title || 'Action Item'}</strong>: Status <code>${r.status}</code> 
+          ${r.issue_number ? `-> GitHub Issue #${r.issue_number}` : ''} 
+          ${r.html_url ? `<a href="${r.html_url}" target="_blank" style="color: #60A5FA; margin-left: 0.5rem;">View Issue 🔗</a>` : ''}
+        `;
+        list.appendChild(box);
+      });
+    }
+  </script>
+</body>
+</html>

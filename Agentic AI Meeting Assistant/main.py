@@ -1,7 +1,9 @@
 from datetime import date
-
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -15,6 +17,14 @@ from src.state import AgentState
 load_dotenv()
 
 app = FastAPI(title="Agentic AI Meeting Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class IngestRequest(BaseModel):
@@ -217,3 +227,12 @@ def dispatch_meeting_candidates(meeting_id: str):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/upload-ui", response_class=HTMLResponse)
+@app.get("/ui", response_class=HTMLResponse)
+def get_upload_ui():
+    ui_path = Path("templates/ui.html")
+    if not ui_path.exists():
+        raise HTTPException(status_code=404, detail="UI template not found.")
+    return HTMLResponse(content=ui_path.read_text(encoding="utf-8"))
