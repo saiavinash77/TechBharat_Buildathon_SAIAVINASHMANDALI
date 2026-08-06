@@ -519,6 +519,16 @@
       if (e.target.files.length) uploadMediaFile(e.target.files[0]);
     }
 
+    async function parseServerError(response) {
+      const text = await response.text();
+      try {
+        const json = JSON.parse(text);
+        return json.detail || JSON.stringify(json);
+      } catch {
+        return text;
+      }
+    }
+
     async function uploadMediaFile(file) {
       const progressContainer = document.getElementById('progress-container');
       const progressBar = document.getElementById('progress-bar');
@@ -549,7 +559,7 @@
             size_bytes: file.size
           })
         });
-        if (!prepRes.ok) throw new Error(await prepRes.text());
+        if (!prepRes.ok) throw new Error(await parseServerError(prepRes));
         const prepData = await prepRes.json();
 
         // Show preview
@@ -590,9 +600,15 @@
             window.__currentXhr = xhr;
             let lastLoaded = 0;
             let lastTime = Date.now();
-
+ 
             xhr.open('PUT', prepData.upload_url, true);
-            xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+            if (prepData.required_headers) {
+              Object.entries(prepData.required_headers).forEach(([key, value]) => {
+                xhr.setRequestHeader(key, value);
+              });
+            } else {
+              xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+            }
 
             // Show background upload snackbar
             try {
@@ -642,7 +658,8 @@
         // 3. Confirm Upload & Transcribe
         statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
         if (!isMock) {
-          await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+          const confirmRes = await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
+          if (!confirmRes.ok) throw new Error(await parseServerError(confirmRes));
         } else {
           // simulate server-side confirm in dry-run
           await new Promise(r => setTimeout(r, 500));
@@ -652,7 +669,7 @@
         let transData;
         if (!isMock) {
           const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
-          if (!transRes.ok) throw new Error(await transRes.text());
+          if (!transRes.ok) throw new Error(await parseServerError(transRes));
           transData = await transRes.json();
         } else {
           // Simulated extraction payload for dry-run so UI can render
@@ -696,6 +713,7 @@
             meeting_id: 'mtg_' + Date.now()
           })
         });
+        if (!res.ok) throw new Error(await parseServerError(res));
         const data = await res.json();
         if (data.status === 'waiting_for_review') {
           activeMeetingId = data.thread_id;
@@ -777,7 +795,7 @@
       try {
         const res = await fetch(`/meetings/${activeMeetingId}/dispatch`, { method: 'POST' });
         if (!res.ok) {
-          throw new Error(await res.text());
+          throw new Error(await parseServerError(res));
         }
         const data = await res.json();
         renderResults(data.results || []);

@@ -113,7 +113,8 @@ def _media_error(error: Exception) -> HTTPException:
         return HTTPException(status_code=404, detail=str(error))
     if isinstance(error, ValueError):
         return HTTPException(status_code=422, detail=str(error))
-    return HTTPException(status_code=502, detail="Media processing failed. Check server logs for the provider error.")
+    error_message = str(error) or "Media processing failed. Check server logs for the provider error."
+    return HTTPException(status_code=502, detail=error_message)
 
 
 def _build_empty_transcript_review_payload(meeting_id: str, transcript: str) -> dict:
@@ -274,6 +275,7 @@ def get_config():
     return {"media_max_upload_bytes": max_bytes, "dry_run": dry, "gcp_project_id": project}
 
 
+@app.get("/", response_class=HTMLResponse)
 @app.get("/upload-ui", response_class=HTMLResponse)
 @app.get("/ui", response_class=HTMLResponse)
 def get_upload_ui():
