@@ -14,6 +14,18 @@ from google.auth.transport.requests import Request
 from google.cloud import storage
 
 
+_GCS_CLIENT_CACHE: dict[str | None, storage.Client] = {}
+
+
+def _get_storage_client(project_id: str | None = None) -> storage.Client:
+    key = project_id or "__default__"
+    client = _GCS_CLIENT_CACHE.get(key)
+    if client is None:
+        client = storage.Client(project=project_id)
+        _GCS_CLIENT_CACHE[key] = client
+    return client
+
+
 class MediaConfigurationError(RuntimeError):
     """Raised when a required server-side media setting is missing."""
 
@@ -83,7 +95,7 @@ class GCSMediaStore:
             raise MediaConfigurationError("GCS_MEDIA_BUCKET is required for media uploads.")
         self.service_account_email = service_account_email or os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
         self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
-        self.client = client or storage.Client(project=self.project_id)
+        self.client = client or _get_storage_client(self.project_id)
         self.bucket = self.client.bucket(self.bucket_name)
 
     @property
