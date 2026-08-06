@@ -60,8 +60,14 @@ def transcribe_media(media_id: str) -> tuple[dict, TranscriptionResult]:
 
     repository.update("media_files", media_id, {"transcription_status": "PROCESSING"})
     try:
-        signed_url = GCSMediaStore(bucket_name=media["bucket_name"]).create_read_url(media["object_key"])
-        transcription = transcribe_url(signed_url)
+        store = GCSMediaStore(bucket_name=media["bucket_name"])
+        try:
+            signed_url = store.create_read_url(media["object_key"])
+            transcription = transcribe_url(signed_url)
+        except Exception:
+            # Fallback to direct GCS SDK stream download for Groq Whisper
+            media_bytes = store.download_bytes(media["object_key"])
+            transcription = transcribe_file_bytes(media["original_filename"], media_bytes)
         repository.update("media_files", media_id, {
             "transcription_status": "COMPLETED",
             "transcription_model": os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo"),

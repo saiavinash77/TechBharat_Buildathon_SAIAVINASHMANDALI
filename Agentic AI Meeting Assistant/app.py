@@ -23,21 +23,29 @@ def _groq_client() -> Groq:
     return Groq(api_key=api_key)
 
 
+from src.media import GCSMediaStore
+
 async def _process_media_file(file_path: str, file_name: str, mime_type: str, file_size: int):
-    """Upload media file to GCS via Signed URL and run Groq Whisper transcription."""
+    """Upload media file to GCS and run Groq Whisper transcription."""
     try:
         await cl.Message(content=f"⏳ Preparing private GCS upload for `{file_name}`...").send()
         upload = create_upload("Uploaded meeting", date.today(), file_name, mime_type, file_size)
         
-        import requests
-        with open(file_path, "rb") as media_file:
-            response = requests.put(
-                upload["upload_url"],
-                data=media_file,
-                headers={"Content-Type": mime_type},
-                timeout=120
-            )
-        response.raise_for_status()
+        try:
+            import requests
+            with open(file_path, "rb") as media_file:
+                response = requests.put(
+                    upload["upload_url"],
+                    data=media_file,
+                    headers={"Content-Type": mime_type},
+                    timeout=120
+                )
+            response.raise_for_status()
+        except Exception:
+            # Fallback to direct GCS SDK stream upload using official client
+            store = GCSMediaStore()
+            store.upload_file(upload["media"]["object_key"], file_path, mime_type)
+
         confirm_upload(upload["media"]["id"])
         
         await cl.Message(content="🎙️ Transcribing media via Groq Whisper...").send()

@@ -77,3 +77,8 @@ def transcribe_url(media_url: str) -> TranscriptionResult:
     if not media_url.startswith(("https://", "http://")):
         raise ValueError("media_url must be an HTTP(S) URL")
     return _transcribe(url=media_url)
+
+
+def transcribe_file_bytes(filename: str, content: bytes) -> TranscriptionResult:
+    """Transcribe binary file bytes directly from GCS media store."""
+    return _transcribe(file=(filename, content))
