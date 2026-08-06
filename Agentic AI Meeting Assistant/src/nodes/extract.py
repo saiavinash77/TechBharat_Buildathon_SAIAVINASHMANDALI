@@ -31,11 +31,22 @@ def load_feedback_rules() -> list:
         return []
 
 
-def extract_node(transcript: str, meeting_date_str: Optional[str] = None, human_feedback: Optional[str] = None) -> MeetingRecord:
+def _normalize_feedback(human_feedback) -> Optional[str]:
+    if not human_feedback:
+        return None
+    if isinstance(human_feedback, dict):
+        if human_feedback.get("decision") == "re_extract":
+            return f"re_extract:{human_feedback.get('note', '')}"
+        return None
+    return str(human_feedback)
+
+
+def extract_node(transcript: str, meeting_date_str: Optional[str] = None, human_feedback=None) -> MeetingRecord:
     from datetime import date
     if not meeting_date_str:
         meeting_date_str = date.today().isoformat()
 
+    human_feedback = _normalize_feedback(human_feedback)
     feedback_rules = load_feedback_rules()
     feedback_context = ""
     if human_feedback and human_feedback.startswith("re_extract"):
@@ -71,7 +82,8 @@ Extract:
 1. Executive summary (2-3 sentences)
 2. Decisions made (list)
 3. Open questions (list)
-4. Candidate action items with classification, speaker, owner acceptance, due date mention, resolved date, priority, confidence (0.0-1.0), extraction reason, and the exact quote from transcript
+4. Risks or blockers raised (list)
+5. Candidate action items with classification, speaker, owner acceptance, due date mention, resolved date, priority, confidence (0.0-1.0), extraction reason, and the exact quote from transcript
 """
 
     try:

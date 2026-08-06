@@ -3,16 +3,18 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from src.graph import graph
 from src.durable_workflow import dispatch_approved_candidates, persist_candidates, review_candidate
+from src.ingest_workflow import create_text_meeting, run_extraction_review
 from src.insforge_client import InsForgeConfigurationError, InsForgeRepository
 from src.media import MediaConfigurationError, GCSMediaStore
 from src.media_workflow import confirm_upload, create_upload, transcribe_media
 from src.state import AgentState
+from src.transcript_parser import parse_transcript_file
 
 load_dotenv()
 
@@ -30,15 +32,8 @@ app.add_middleware(
 class IngestRequest(BaseModel):
     transcript: str
     meeting_date: str
+    title: str = "Text transcript meeting"
     meeting_id: str | None = None
-
-
-class MediaUploadRequest(BaseModel):
-    title: str = "Untitled meeting"
-    meeting_date: date
-    filename: str
-    content_type: str
-    size_bytes: int
 
 
 class ReviewDecision(BaseModel):
@@ -63,45 +58,12 @@ class CandidateReviewRequest(BaseModel):
     final_owner_name: str | None = Field(default=None, max_length=200)
 
 
-@app.post("/ingest")
-def ingest(req: IngestRequest):
-    """Extract candidates then pause at the native LangGraph review interrupt."""
-    state: AgentState = {
-        "transcript": req.transcript,
-        "meeting_date": req.meeting_date,
-        "meeting_id": req.meeting_id or req.meeting_date,
-        "approved_items": [],
-        "rejected_items": [],
-        "action_hashes": [],
-        "execution_results": [],
-    }
-    config = {"configurable": {"thread_id": req.meeting_id or req.meeting_date}}
-    thread_id = config["configurable"]["thread_id"]
-    graph.invoke(state, config)
-    snapshot = graph.get_state(config)
-    interrupt_payload = None
-    if snapshot and snapshot.tasks and len(snapshot.tasks) > 0 and snapshot.tasks[0].interrupts:
-        interrupt_payload = snapshot.tasks[0].interrupts[0].value
-
-    if interrupt_payload is None:
-        extracted = snapshot.values.get("extracted") if snapshot else None
-        err = snapshot.values.get("error") if snapshot else None
-        if extracted is not None and getattr(extracted, "executive_summary", "").startswith("Extraction failed"):
-            err = extracted.executive_summary
-        return {
-            "status": "extraction_failed",
-            "thread_id": thread_id,
-            "error": err or "Extraction did not produce reviewable candidates.",
-        }
-    return {"status": "waiting_for_review", "thread_id": thread_id, "review": interrupt_payload}
-
-
-@app.post("/review")
-def review(req: ReviewRequest):
-    """Resume a paused workflow. Only reviewer-supplied approved items can dispatch."""
-    config = {"configurable": {"thread_id": req.thread_id}}
-    result = graph.invoke(Command(resume=req.decision.model_dump()), config)
-    return {"status": "completed", "thread_id": req.thread_id, "result": result}
+class MediaUploadRequest(BaseModel):
+    title: str = "Untitled meeting"
+    meeting_date: date
+    filename: str
+    content_type: str
+    size_bytes: int
 
 
 def _media_error(error: Exception) -> HTTPException:
@@ -111,11 +73,19 @@ def _media_error(error: Exception) -> HTTPException:
         return HTTPException(status_code=404, detail=str(error))
     if isinstance(error, ValueError):
         return HTTPException(status_code=422, detail=str(error))
-    return HTTPException(status_code=502, detail="Media processing failed. Check server logs for the provider error.")
+    return HTTPException(status_code=502, detail=str(error))
 
 
-def _start_media_review(media: dict, transcript: str) -> dict | None:
-    """Immediately hand a completed transcript to the LangGraph review gate."""
+def _enrich_review_payload(payload: dict, extracted) -> dict:
+    if extracted:
+        payload["decisions"] = extracted.decisions_made
+        payload["open_questions"] = extracted.open_questions
+        payload["risks_or_blockers"] = getattr(extracted, "risks_or_blockers", [])
+    return payload
+
+
+def _start_media_review(media: dict, transcript: str) -> dict:
+    """Run extraction and persist durable candidates for media meetings."""
     repository = InsForgeRepository()
     meeting = repository.get_one("meetings", media["meeting_id"])
     if not meeting:
@@ -133,27 +103,80 @@ def _start_media_review(media: dict, transcript: str) -> dict | None:
         "execution_results": [],
     }, config)
     snapshot = graph.get_state(config)
-    repository.update("meetings", meeting["id"], {"processing_status": "AWAITING_REVIEW"})
-    if snapshot and snapshot.tasks and len(snapshot.tasks) > 0 and snapshot.tasks[0].interrupts:
-        extracted = snapshot.values.get("extracted")
-        candidates = persist_candidates(repository, meeting["id"], thread_id, extracted.action_items if extracted else [])
-        payload = dict(snapshot.tasks[0].interrupts[0].value)
-        payload["items"] = candidates
-        return {"thread_id": thread_id, "payload": payload}
-    # Either extraction failed or the graph ended without a review interrupt.
-    # Surface a descriptive error to the caller instead of returning payload=None silently.
-    extracted = snapshot.values.get("extracted") if snapshot else None
-    err_detail = None
-    if extracted is not None and getattr(extracted, "executive_summary", "").startswith("Extraction failed"):
-        err_detail = extracted.executive_summary
-    raise RuntimeError(
-        err_detail or "Extraction did not produce any reviewable candidates. Check that the transcript is long enough and Groq credentials are configured."
-    )
+    repository.update("meetings", meeting["id"], {"processing_status": "AWAITING_REVIEW", "transcript_text": transcript})
+
+    if not (snapshot and snapshot.tasks and snapshot.tasks[0].interrupts):
+        extracted = snapshot.values.get("extracted") if snapshot else None
+        err_detail = None
+        if extracted is not None and getattr(extracted, "executive_summary", "").startswith("Extraction failed"):
+            err_detail = extracted.executive_summary
+        raise RuntimeError(err_detail or "Extraction did not produce reviewable candidates.")
+
+    extracted = snapshot.values.get("extracted")
+    candidates = persist_candidates(repository, meeting["id"], thread_id, extracted.action_items if extracted else [])
+    payload = _enrich_review_payload(dict(snapshot.tasks[0].interrupts[0].value), extracted)
+    payload["items"] = candidates
+    return {"thread_id": thread_id, "payload": payload}
+
+
+@app.get("/")
+def root():
+    return RedirectResponse(url="/ui")
+
+
+@app.post("/ingest")
+def ingest(req: IngestRequest):
+    """Ingest plain-text transcript through the unified durable review pipeline."""
+    try:
+        meeting_date = date.fromisoformat(req.meeting_date)
+        meeting = create_text_meeting(req.title, meeting_date, req.transcript)
+        result = run_extraction_review(meeting, req.transcript)
+        return {"status": "awaiting_review", **result}
+    except Exception as error:
+        raise _media_error(error) from error
+
+
+@app.post("/ingest/file")
+async def ingest_transcript_file(file: UploadFile = File(...)):
+    """Ingest .txt, .vtt, or .srt transcript files."""
+    try:
+        content = await file.read()
+        filename = Path(file.filename or "transcript.txt").name
+        transcript = parse_transcript_file(content, filename)
+        if len(transcript.strip()) < 50:
+            raise ValueError("Transcript too short after parsing. Need at least 50 characters.")
+        meeting = create_text_meeting(filename, date.today(), transcript)
+        result = run_extraction_review(meeting, transcript)
+        return {"status": "awaiting_review", "filename": filename, **result}
+    except Exception as error:
+        raise _media_error(error) from error
+
+
+@app.post("/review")
+def review(req: ReviewRequest):
+    """Legacy LangGraph bulk resume (prefer per-item review + dispatch)."""
+    config = {"configurable": {"thread_id": req.thread_id}}
+    result = graph.invoke(Command(resume=req.decision.model_dump()), config)
+    return {"status": "completed", "thread_id": req.thread_id, "result": result}
+
+
+@app.get("/meetings/{meeting_id}")
+def get_meeting(meeting_id: str):
+    """Meeting record, action items, and audit trail for demo / judges."""
+    try:
+        repository = InsForgeRepository()
+        meeting = repository.get_one("meetings", meeting_id)
+        if not meeting:
+            raise LookupError("Meeting not found.")
+        items = repository.list("action_items", {"meeting_id": f"eq.{meeting_id}"}, order="created_at.asc")
+        audits = repository.list("audit_events", {"meeting_id": f"eq.{meeting_id}"}, order="created_at.asc")
+        return {"meeting": meeting, "action_items": items, "audit_events": audits}
+    except Exception as error:
+        raise _media_error(error) from error
 
 
 @app.post("/media/uploads")
 def prepare_media_upload(req: MediaUploadRequest):
-    """Create private GCS upload instructions and durable InsForge metadata."""
     try:
         result = create_upload(req.title, req.meeting_date, req.filename, req.content_type, req.size_bytes)
         return {
@@ -170,17 +193,14 @@ def prepare_media_upload(req: MediaUploadRequest):
 
 @app.post("/media/direct-upload")
 async def direct_media_upload(file: UploadFile = File(...)):
-    """Upload media file directly to GCS and transcribe in 1 call."""
     try:
         content = await file.read()
         filename = Path(file.filename or "recording.mp4").name
         content_type = file.content_type or "video/mp4"
         upload = create_upload(filename, date.today(), filename, content_type, len(content))
-        
         store = GCSMediaStore()
         store.upload_bytes(upload["media"]["object_key"], content, content_type)
         confirm_upload(upload["media"]["id"])
-        
         media, transcription = transcribe_media(upload["media"]["id"])
         review = _start_media_review(media, transcription.text)
         return {
@@ -203,7 +223,6 @@ def mark_media_uploaded(media_id: str):
 
 @app.post("/media/{media_id}/transcribe")
 def start_transcription(media_id: str):
-    """Transcribe a confirmed private GCS object and persist timestamp evidence."""
     try:
         media, transcription = transcribe_media(media_id)
         review = _start_media_review(media, transcription.text)
@@ -221,7 +240,6 @@ def start_transcription(media_id: str):
 
 @app.post("/meetings/{meeting_id}/action-items/{action_item_id}/review")
 def review_action_item(meeting_id: str, action_item_id: str, req: CandidateReviewRequest):
-    """Persist an individual reviewer decision before any GitHub dispatch is possible."""
     try:
         return review_candidate(
             InsForgeRepository(),
@@ -242,7 +260,6 @@ def review_action_item(meeting_id: str, action_item_id: str, req: CandidateRevie
 
 @app.post("/meetings/{meeting_id}/dispatch")
 def dispatch_meeting_candidates(meeting_id: str):
-    """Create only reviewer-approved eligible GitHub issues; dry run is the default."""
     try:
         return {"results": dispatch_approved_candidates(InsForgeRepository(), meeting_id)}
     except Exception as error:
@@ -251,7 +268,7 @@ def dispatch_meeting_candidates(meeting_id: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "dry_run": __import__("os").getenv("DRY_RUN", "true")}
 
 
 @app.get("/upload-ui", response_class=HTMLResponse)

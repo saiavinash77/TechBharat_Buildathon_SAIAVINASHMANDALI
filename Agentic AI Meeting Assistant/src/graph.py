@@ -38,6 +38,9 @@ def node_review(state: AgentState):
         "type": "review_required",
         "meeting_id": state.get("meeting_id"),
         "summary": extracted.executive_summary if extracted else "",
+        "decisions": extracted.decisions_made if extracted else [],
+        "open_questions": extracted.open_questions if extracted else [],
+        "risks_or_blockers": getattr(extracted, "risks_or_blockers", []) if extracted else [],
         "items": proposed_items,
         "rules": {
             "explicit_commitment": "May be assigned only when the speaker directly accepted it.",

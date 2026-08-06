@@ -21,7 +21,7 @@ def test_resolve_normalizes_an_explicit_owner_date_and_confidence():
     resolved = resolve_node(
         record,
         "2026-08-05",
-        roster={"Rahul Mehta": {"email": "rahul@example.com"}},
+        roster={"Rahul Mehta": {"email": "rahul@example.com", "github": "rahul-dev", "aliases": ["rahul", "rahul mehta"]}},
     )
     item = resolved.action_items[0]
 

@@ -8,6 +8,7 @@ from typing import Any
 
 from src.insforge_client import InsForgeRepository
 from src.nodes.execute import execute_node
+from src.slack_recap import post_meeting_recap
 from src.state import ActionItem
 
 
@@ -55,6 +56,8 @@ def _review_view(item: dict[str, Any]) -> dict[str, Any]:
         "extraction_reason": item["extraction_reason"],
         "review_status": item["review_status"],
         "reviewed_by": item.get("reviewed_by"),
+        "github_assignee_login": item.get("github_assignee_login"),
+        "dispatch_status": item.get("dispatch_status"),
     }
 
 
@@ -214,5 +217,24 @@ def dispatch_approved_candidates(repository: InsForgeRepository, meeting_id: str
             "meeting_id": meeting_id, "action_item_id": item["id"], "event_type": event_type,
             "actor_type": "SYSTEM", "payload": result,
         })
-        results.append({"action_item_id": item["id"], "status": dispatch_status.lower(), "result": result})
+        results.append({
+            "action_item_id": item["id"],
+            "title": item["final_title"],
+            "status": dispatch_status.lower(),
+            "html_url": result.get("issue_url"),
+            "dry_run": result.get("dry_run", False),
+            "result": result,
+        })
+
+    if results:
+        meeting = repository.get_one("meetings", meeting_id)
+        slack_result = post_meeting_recap(meeting or {}, results)
+        if not slack_result.get("skipped"):
+            repository.insert("audit_events", {
+                "meeting_id": meeting_id,
+                "event_type": "SLACK_RECAP_POSTED" if slack_result.get("success") else "SLACK_RECAP_FAILED",
+                "actor_type": "SYSTEM",
+                "payload": slack_result,
+            })
+
     return results

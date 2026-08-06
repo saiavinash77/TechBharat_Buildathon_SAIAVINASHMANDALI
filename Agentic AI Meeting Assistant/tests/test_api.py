@@ -8,40 +8,44 @@ def test_health_endpoint_is_available_without_model_credentials():
     response = TestClient(app).get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "dry_run" in body
 
 
-def test_ingest_pauses_at_a_native_review_interrupt_without_model_credentials():
+def test_ingest_pauses_at_review_interrupt_without_model_credentials():
     response = TestClient(app).post("/ingest", json={
-        "transcript": "We discussed the roadmap and will decide next week.",
+        "transcript": (
+            "Priya: I will publish the OpenAPI spec by Friday.\n"
+            "Rahul: I'll finish the database migration by Tuesday.\n"
+            "Avi: I can set up the CI/CD pipeline by end of month."
+        ),
         "meeting_date": "2026-08-05",
-        "meeting_id": "native-interrupt-test",
+        "title": "Standup",
     })
 
     assert response.status_code == 200
-    assert response.json()["status"] == "waiting_for_review"
-    assert response.json()["review"]["type"] == "review_required"
+    body = response.json()
+    assert body["status"] == "awaiting_review"
+    assert body["meeting_id"]
+    assert body["review"]["payload"]["items"] is not None
 
 
-def test_ingest_returns_graceful_extraction_failed_status_without_crashing(monkeypatch):
-    """If the graph ends without reaching the LangGraph interrupt (no review payload)
-    the endpoint must not IndexError. A descriptive status is returned instead."""
+def test_ingest_returns_error_when_extraction_produces_no_candidates(monkeypatch):
+    monkeypatch.setattr(main, "create_text_meeting", lambda *args, **kwargs: {
+        "id": "meeting-test-1",
+        "meeting_key": "mtg_test",
+        "meeting_date": "2026-08-06",
+    })
 
-    class FakeSnapshot:
-        tasks = []           # simulate graph that ran to END with no interrupt
-        values = {"error": None}
-        next_config = None
+    def fail_review(*args, **kwargs):
+        raise RuntimeError("Extraction did not produce reviewable candidates.")
 
-    monkeypatch.setattr(main.graph, "get_state", lambda _config: FakeSnapshot())
+    monkeypatch.setattr(main, "run_extraction_review", fail_review)
 
     resp = TestClient(app).post("/ingest", json={
         "transcript": "Alpha bravo charlie delta.",
         "meeting_date": "2026-08-06",
-        "meeting_id": "fail-safe-test",
     })
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["status"] == "extraction_failed"
-    assert body["thread_id"] == "fail-safe-test"
-    assert "Extraction did not produce reviewable candidates" in body["error"]
-
+    assert resp.status_code == 502
+    assert "reviewable candidates" in resp.json()["detail"]

@@ -1,0 +1,10 @@
+{
+  "transcript_file": "data/sample_transcript.txt",
+  "meeting_date": "2026-08-05",
+  "action_items": [
+    { "title": "OpenAPI spec", "owner": "Priya" },
+    { "title": "database schema migration", "owner": "Rahul" },
+    { "title": "CI/CD pipeline", "owner": "Avi" },
+    { "title": "auth module", "owner": "Rahul" }
+  ]
+}

@@ -17,12 +17,18 @@ class ActionItem(BaseModel):
     priority: str = Field(default="MEDIUM", description="HIGH, MEDIUM, or LOW")
     confidence_score: float = Field(default=0.0, description="0.0 to 1.0")
     quote_provenance: str = Field(default="", description="Exact transcript sentence this came from")
+    owner_resolution_status: Literal["RESOLVED", "UNRESOLVED", "UNASSIGNED"] = Field(
+        default="UNASSIGNED",
+        description="Whether owner_name mapped to team roster",
+    )
+    suggested_github_login: Optional[str] = Field(default=None, description="GitHub login from roster when resolved")
 
 
 class MeetingRecord(BaseModel):
     executive_summary: str = Field(default="")
     decisions_made: List[str] = Field(default_factory=list)
     open_questions: List[str] = Field(default_factory=list)
+    risks_or_blockers: List[str] = Field(default_factory=list)
     action_items: List[ActionItem] = Field(default_factory=list)
 
 

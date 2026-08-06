@@ -1,14 +1,17 @@
 {
   "priya": {
     "email": "priya@company.com",
+    "github": "priya-dev",
     "aliases": ["priya", "priya sharma"]
   },
   "rahul": {
     "email": "rahul@company.com",
+    "github": "rahul-dev",
     "aliases": ["rahul", "rahul mehta"]
   },
   "avi": {
     "email": "avi@company.com",
+    "github": "saiavinash77",
     "aliases": ["avi", "avinash", "sai avinash"]
   }
 }

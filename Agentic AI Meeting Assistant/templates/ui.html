@@ -3,518 +3,329 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agentic AI Meeting Assistant — Safety-First Review Gate</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Agentic AI Meeting Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
-      --glass-bg: rgba(30, 41, 59, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --accent-blue: #3B82F6;
-      --accent-purple: #8B5CF6;
-      --accent-green: #10B981;
-      --accent-yellow: #F59E0B;
-      --accent-red: #EF4444;
-      --text-main: #F8FAFC;
-      --text-muted: #94A3B8;
+      --bg: #0f172a; --card: rgba(30,41,59,.85); --border: rgba(255,255,255,.1);
+      --text: #f8fafc; --muted: #94a3b8; --blue: #3b82f6; --green: #10b981;
+      --yellow: #f59e0b; --red: #ef4444; --purple: #8b5cf6;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg-gradient);
-      color: var(--text-main);
-      min-height: 100vh;
-      padding: 2rem 1rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 1000px;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    header {
-      text-align: center;
-      padding: 1.5rem;
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: 1rem;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-    }
-    header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      background: linear-gradient(to right, #60A5FA, #A78BFA);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5rem;
-    }
-    header p { color: var(--text-muted); font-size: 0.95rem; }
-
-    .badges {
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      margin-top: 1rem;
-    }
-    .badge {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--glass-border);
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      color: #CBD5E1;
-    }
-
-    .card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-    }
-
-    .tabs {
-      display: flex;
-      gap: 1rem;
-      border-bottom: 1px solid var(--glass-border);
-      padding-bottom: 0.75rem;
-      margin-bottom: 1.25rem;
-    }
-    .tab-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      transition: all 0.2s;
-    }
-    .tab-btn.active {
-      color: var(--text-main);
-      background: rgba(59, 130, 246, 0.2);
-      border: 1px solid rgba(59, 130, 246, 0.4);
-    }
-
-    .dropzone {
-      border: 2px dashed rgba(139, 92, 246, 0.4);
-      border-radius: 0.75rem;
-      padding: 2.5rem 1.5rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: rgba(15, 23, 42, 0.4);
-    }
-    .dropzone:hover {
-      border-color: var(--accent-purple);
-      background: rgba(139, 92, 246, 0.1);
-    }
-    .dropzone p { margin-top: 0.5rem; color: var(--text-muted); font-size: 0.9rem; }
-
-    input[type="file"] { display: none; }
-    textarea {
-      width: 100%;
-      height: 160px;
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid var(--glass-border);
-      border-radius: 0.75rem;
-      color: var(--text-main);
-      padding: 1rem;
-      font-family: inherit;
-      resize: vertical;
-      font-size: 0.95rem;
-    }
-    textarea:focus { outline: 1px solid var(--accent-blue); }
-
-    .btn {
-      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-      color: #FFF;
-      font-weight: 600;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      transition: transform 0.1s, opacity 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .btn-green { background: linear-gradient(135deg, #10B981, #059669); }
-    .btn-red { background: linear-gradient(135deg, #EF4444, #DC2626); }
-
-    .progress-bar-container {
-      width: 100%;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 9999px;
-      overflow: hidden;
-      margin-top: 1rem;
-      display: none;
-    }
-    .progress-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(to right, #3B82F6, #10B981);
-      transition: width 0.2s;
-    }
-    .status-text {
-      margin-top: 0.5rem;
-      font-size: 0.85rem;
-      color: #60A5FA;
-      text-align: center;
-    }
-
-    .item-card {
-      background: rgba(15, 23, 42, 0.7);
-      border: 1px solid var(--glass-border);
-      border-radius: 0.75rem;
-      padding: 1.25rem;
-      margin-bottom: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .badge-commitment { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-needs { background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.4); }
-    .badge-discussion { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); }
-
-    .quote-box {
-      background: rgba(0, 0, 0, 0.2);
-      border-left: 3px solid var(--accent-purple);
-      padding: 0.5rem 0.75rem;
-      font-style: italic;
-      color: #CBD5E1;
-      font-size: 0.88rem;
-    }
-
-    .inline-fields {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 0.75rem;
-      margin-top: 0.5rem;
-    }
-    .field-group label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-    .field-group input, .field-group select {
-      width: 100%;
-      background: rgba(30, 41, 59, 0.8);
-      border: 1px solid var(--glass-border);
-      border-radius: 0.375rem;
-      color: #FFF;
-      padding: 0.4rem 0.6rem;
-      font-size: 0.85rem;
-    }
-
-    .hidden { display: none; }
+    body { font-family: Inter, sans-serif; background: linear-gradient(135deg,#0f172a,#1e1b4b,#0f172a); color: var(--text); min-height: 100vh; padding: 1.5rem; }
+    .wrap { max-width: 960px; margin: 0 auto; display: grid; gap: 1rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+    .sub { color: var(--muted); font-size: .9rem; }
+    .tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .tab { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: .5rem .9rem; border-radius: 8px; cursor: pointer; }
+    .tab.active { color: var(--text); border-color: var(--blue); background: rgba(59,130,246,.15); }
+    .panel { display: none; } .panel.active { display: block; }
+    textarea { width: 100%; min-height: 140px; background: #0b1220; border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: .75rem; }
+    .drop { border: 2px dashed rgba(139,92,246,.5); border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; }
+    .btn { border: none; border-radius: 8px; padding: .55rem 1rem; font-weight: 600; cursor: pointer; color: #fff; }
+    .btn-primary { background: linear-gradient(135deg,var(--blue),var(--purple)); }
+    .btn-green { background: var(--green); }
+    .btn-red { background: var(--red); }
+    .btn-sm { padding: .35rem .7rem; font-size: .8rem; }
+    .progress { height: 8px; background: rgba(255,255,255,.1); border-radius: 99px; overflow: hidden; margin-top: .75rem; display: none; }
+    .progress > div { height: 100%; width: 0; background: linear-gradient(90deg,var(--blue),var(--green)); transition: width .2s; }
+    .status { color: #93c5fd; font-size: .85rem; margin-top: .5rem; min-height: 1.2rem; }
+    .meta-grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin: 1rem 0; }
+    .meta { background: rgba(15,23,42,.6); border-left: 3px solid var(--blue); padding: .75rem; border-radius: 6px; font-size: .88rem; }
+    .meta ul { margin: .35rem 0 0 1rem; color: #cbd5e1; }
+    .item { background: rgba(15,23,42,.7); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: .75rem; }
+    .item-head { display: flex; justify-content: space-between; gap: .5rem; align-items: start; margin-bottom: .5rem; }
+    .badge { font-size: .72rem; padding: .2rem .55rem; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+    .b-commit { color: #6ee7b7; border-color: #059669; background: rgba(16,185,129,.15); }
+    .b-needs { color: #fcd34d; border-color: #d97706; background: rgba(245,158,11,.15); }
+    .b-disc { color: #fca5a5; border-color: #dc2626; background: rgba(239,68,68,.15); }
+    .b-approved { color: #6ee7b7; border-color: #059669; }
+    .b-rejected { color: #fca5a5; border-color: #dc2626; }
+    .quote { font-style: italic; color: #cbd5e1; font-size: .85rem; border-left: 3px solid var(--purple); padding-left: .6rem; margin: .5rem 0; }
+    .fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: .5rem; margin: .5rem 0; }
+    label { font-size: .72rem; color: var(--muted); display: block; margin-bottom: .2rem; }
+    input, select { width: 100%; background: #1e293b; border: 1px solid var(--border); color: #fff; border-radius: 6px; padding: .35rem .5rem; font-size: .85rem; }
+    .actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
+    .hidden { display: none !important; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
+    .result { padding: .6rem .8rem; border-radius: 8px; margin-bottom: .4rem; background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.35); font-size: .88rem; }
+    .warn { color: #fcd34d; font-size: .8rem; margin-top: .25rem; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>🎙️ Agentic AI Meeting Assistant</h1>
-      <p>Direct GCS Storage Streaming & Safety-First Human Review Gate</p>
-      <div class="badges">
-        <span class="badge">GCP Cloud Storage (Direct GCS)</span>
-        <span class="badge">Groq Whisper (2s STT)</span>
-        <span class="badge">LLaMA 3.3 70B</span>
-        <span class="badge">InsForge PostgreSQL</span>
-        <span class="badge">GitHub Side Effect Engine</span>
-      </div>
-    </header>
+  <div class="wrap">
+    <div class="card">
+      <h1>Agentic AI Meeting Assistant</h1>
+      <p class="sub">Safety-first agent: AI proposes action items with evidence — you approve — then GitHub issues are created. Zero unapproved side effects.</p>
+    </div>
 
     <div class="card">
       <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('upload')">📁 Direct GCS Media Upload</button>
-        <button class="tab-btn" onclick="switchTab('text')">📝 Paste Text Transcript</button>
+        <button class="tab active" data-tab="text">Paste transcript</button>
+        <button class="tab" data-tab="file">Upload .txt / .vtt / .srt</button>
+        <button class="tab" data-tab="media">Upload audio/video</button>
       </div>
 
-      <!-- Upload Tab -->
-      <div id="tab-upload">
-        <div class="dropzone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📹</div>
-          <h3>Drag & Drop Video / Audio File Here</h3>
-          <p>Supports MP4, WebM, MP3, WAV, M4A up to 2 GB directly to GCP Storage</p>
-          <input type="file" id="file-input" accept="audio/*,video/*" onchange="handleFileSelect(event)">
-        </div>
-        <div id="file-info" style="margin-top: 0.75rem; font-size: 0.9rem; color: #A78BFA;"></div>
-        <div class="progress-bar-container" id="progress-container">
-          <div class="progress-bar" id="progress-bar"></div>
-        </div>
-        <div class="status-text" id="status-text"></div>
+      <div id="panel-text" class="panel active">
+        <textarea id="text-input" placeholder="Paste meeting transcript (speaker labels help)..."></textarea>
+        <div style="margin-top:.75rem;text-align:right"><button class="btn btn-primary" onclick="analyzeText()">Analyze</button></div>
       </div>
 
-      <!-- Text Tab -->
-      <div id="tab-text" class="hidden">
-        <textarea id="text-transcript" placeholder="Paste your raw meeting transcript text here (>50 characters)..."></textarea>
-        <div style="margin-top: 1rem; text-align: right;">
-          <button class="btn" onclick="submitTextTranscript()">🧠 Analyze Transcript</button>
-        </div>
+      <div id="panel-file" class="panel">
+        <div class="drop" onclick="document.getElementById('file-transcript').click()">Click to upload .txt, .vtt, or .srt</div>
+        <input type="file" id="file-transcript" class="hidden" accept=".txt,.vtt,.srt" onchange="uploadTranscriptFile(this.files[0])">
+      </div>
+
+      <div id="panel-media" class="panel">
+        <div class="drop" onclick="document.getElementById('file-media').click()">Click to upload MP3 / MP4 / WebM (or drag here)</div>
+        <input type="file" id="file-media" class="hidden" accept="audio/*,video/*" onchange="uploadMedia(this.files[0])">
+        <div class="progress" id="progress-wrap"><div id="progress-bar"></div></div>
+        <div class="status" id="media-status"></div>
       </div>
     </div>
 
-    <!-- Review Container -->
-    <div id="review-container" class="card hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2>📋 Candidate Action Items</h2>
-        <button class="btn btn-green" onclick="dispatchAll()">🚀 Approve & Dispatch to GitHub</button>
+    <div id="review-section" class="card hidden">
+      <div class="toolbar">
+        <h2>Review before dispatch</h2>
+        <div>
+          <span class="sub" id="meeting-label"></span>
+          <button class="btn btn-green btn-sm" onclick="dispatchApproved()">Dispatch approved to GitHub</button>
+        </div>
       </div>
-      <div id="executive-summary" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent-blue); border-radius: 0.5rem;"></div>
-      <div id="candidate-list"></div>
+      <div id="summary-box" class="meta"></div>
+      <div class="meta-grid">
+        <div class="meta" id="decisions-box"><strong>Decisions</strong><ul id="decisions-list"></ul></div>
+        <div class="meta" id="questions-box"><strong>Open questions</strong><ul id="questions-list"></ul></div>
+        <div class="meta" id="risks-box"><strong>Risks / blockers</strong><ul id="risks-list"></ul></div>
+      </div>
+      <div id="items-list"></div>
     </div>
 
-    <!-- Results Container -->
-    <div id="results-container" class="card hidden">
-      <h2>🚀 Execution & Audit Log Results</h2>
-      <div id="results-list" style="margin-top: 1rem;"></div>
+    <div id="results-section" class="card hidden">
+      <h2>Dispatch results & audit</h2>
+      <div id="results-list" style="margin-top:.75rem"></div>
+      <div id="audit-list" style="margin-top:1rem"></div>
     </div>
   </div>
 
   <script>
-    let activeMeetingId = null;
-    let currentCandidates = [];
+    let meetingId = null;
+    let items = [];
+    const REVIEWER = 'Demo Reviewer';
 
-    function switchTab(tab) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      if (tab === 'upload') {
-        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-        document.getElementById('tab-upload').classList.remove('hidden');
-        document.getElementById('tab-text').classList.add('hidden');
-      } else {
-        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
-        document.getElementById('tab-upload').classList.add('hidden');
-        document.getElementById('tab-text').classList.remove('hidden');
-      }
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      };
+    });
+
+    function showReview(data) {
+      meetingId = data.meeting_id;
+      const payload = (data.review && data.review.payload) ? data.review.payload : (data.review || {});
+      items = payload.items || [];
+      document.getElementById('review-section').classList.remove('hidden');
+      document.getElementById('meeting-label').textContent = 'Meeting ID: ' + meetingId;
+      document.getElementById('summary-box').innerHTML = '<strong>Executive summary</strong><br>' + (payload.summary || 'Analyzed.');
+      fillList('decisions-list', payload.decisions || []);
+      fillList('questions-list', payload.open_questions || []);
+      fillList('risks-list', payload.risks_or_blockers || []);
+      renderItems();
+      document.getElementById('results-section').classList.add('hidden');
     }
 
-    function handleDrop(e) {
-      e.preventDefault();
-      if (e.dataTransfer.files.length) uploadMediaFile(e.dataTransfer.files[0]);
+    function fillList(id, arr) {
+      const el = document.getElementById(id);
+      el.innerHTML = (arr.length ? arr : ['None detected']).map(x => '<li>' + escapeHtml(x) + '</li>').join('');
     }
 
-    function handleFileSelect(e) {
-      if (e.target.files.length) uploadMediaFile(e.target.files[0]);
+    function badgeClass(c) {
+      if (c === 'EXPLICIT_COMMITMENT') return 'b-commit';
+      if (c === 'NEEDS_CONFIRMATION') return 'b-needs';
+      return 'b-disc';
     }
 
-    async function uploadMediaFile(file) {
-      const progressContainer = document.getElementById('progress-container');
-      const progressBar = document.getElementById('progress-bar');
-      const statusText = document.getElementById('status-text');
-      const fileInfo = document.getElementById('file-info');
-
-      fileInfo.textContent = `Selected: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`;
-      progressContainer.style.display = 'block';
-      progressBar.style.width = '0%';
-      statusText.textContent = '1/4 Requesting private GCS upload URL...';
-
-      try {
-        // 1. Prepare Upload
-        const prepRes = await fetch('/media/uploads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: file.name,
-            meeting_date: new Date().toISOString().split('T')[0],
-            filename: file.name,
-            content_type: file.type || 'video/mp4',
-            size_bytes: file.size
-          })
-        });
-        if (!prepRes.ok) throw new Error(await prepRes.text());
-        const prepData = await prepRes.json();
-
-        // 2. Direct GCS Upload with Progress XHR (with backend fallback)
-        statusText.textContent = '2/4 Uploading to GCP Cloud Storage...';
-        let uploadSucceeded = false;
-
-        try {
-          await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('PUT', prepData.upload_url, true);
-            xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                const pct = ((e.loaded / e.total) * 100).toFixed(0);
-                progressBar.style.width = pct + '%';
-                statusText.textContent = `2/4 Uploading to GCP Storage: ${pct}%`;
-              }
-            };
-            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('GCS upload HTTP ' + xhr.status));
-            xhr.onerror = () => reject(new Error('CORS/Network error during direct GCS upload'));
-            xhr.send(file);
-          });
-          uploadSucceeded = true;
-        } catch (uploadErr) {
-          console.warn('Direct GCS upload failed, falling back to backend stream:', uploadErr);
-        }
-
-        if (uploadSucceeded) {
-          // 3. Confirm Upload & Transcribe
-          statusText.textContent = '3/4 Confirming storage and running Groq Whisper transcription...';
-          await fetch(`/media/${prepData.media_id}/confirm-upload`, { method: 'POST' });
-
-          statusText.textContent = '4/4 Transcribing & extracting action items with Groq...';
-          const transRes = await fetch(`/media/${prepData.media_id}/transcribe`, { method: 'POST' });
-          if (!transRes.ok) throw new Error(await transRes.text());
-          const transData = await transRes.json();
-
-          statusText.textContent = '✅ Extraction Complete!';
-          activeMeetingId = prepData.meeting_id;
-          renderReviewCards(transData.review ? transData.review.payload : null);
-        } else {
-          // Fallback: Upload via /media/direct-upload
-          statusText.textContent = '2/4 Uploading media stream to backend...';
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const directRes = await new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/media/direct-upload', true);
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                const pct = ((e.loaded / e.total) * 100).toFixed(0);
-                progressBar.style.width = pct + '%';
-                statusText.textContent = `2/4 Uploading media stream: ${pct}%`;
-              }
-            };
-            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve(JSON.parse(xhr.responseText)) : reject(new Error('Direct upload HTTP ' + xhr.status));
-            xhr.onerror = () => reject(new Error('Network error during media upload'));
-            xhr.send(formData);
-          });
-
-          statusText.textContent = '✅ Extraction Complete!';
-          activeMeetingId = directRes.meeting_id;
-          renderReviewCards(directRes.review ? directRes.review.payload : null);
-        }
-
-      } catch (err) {
-        statusText.textContent = `❌ Upload failed: ${err.message}`;
-        progressBar.style.background = '#EF4444';
-      }
+    function badgeLabel(c) {
+      if (c === 'EXPLICIT_COMMITMENT') return 'Explicit commitment';
+      if (c === 'NEEDS_CONFIRMATION') return 'Needs confirmation';
+      return 'Discussion only';
     }
 
-    async function submitTextTranscript() {
-      const text = document.getElementById('text-transcript').value.trim();
-      if (text.length < 50) return alert('Please enter a transcript of at least 50 characters.');
-
-      try {
-        const res = await fetch('/ingest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transcript: text,
-            meeting_date: new Date().toISOString().split('T')[0],
-            meeting_id: 'mtg_' + Date.now()
-          })
-        });
-        const data = await res.json();
-        if (data.status === 'waiting_for_review') {
-          activeMeetingId = data.thread_id;
-          renderReviewCards(data.review);
-        } else {
-          alert('Extraction failed: ' + (data.error || 'No reviewable items found.'));
-        }
-      } catch (err) {
-        alert('Analysis error: ' + err.message);
-      }
-    }
-
-    function renderReviewCards(payload) {
-      const container = document.getElementById('review-container');
-      const summaryBox = document.getElementById('executive-summary');
-      const list = document.getElementById('candidate-list');
-
-      container.classList.remove('hidden');
-      list.innerHTML = '';
-      summaryBox.innerHTML = `<strong>Executive Summary</strong>: ${payload && payload.summary ? payload.summary : 'Meeting transcript analyzed.'}`;
-
-      const items = (payload && payload.items) ? payload.items : (payload && payload.action_items ? payload.action_items : []);
-      currentCandidates = items;
-
+    function renderItems() {
+      const root = document.getElementById('items-list');
+      root.innerHTML = '';
       items.forEach((item, idx) => {
-        const badgeClass = item.classification === 'EXPLICIT_COMMITMENT' ? 'badge-commitment' : (item.classification === 'NEEDS_CONFIRMATION' ? 'badge-needs' : 'badge-discussion');
-        const badgeText = item.classification === 'EXPLICIT_COMMITMENT' ? '🟢 Commitment' : (item.classification === 'NEEDS_CONFIRMATION' ? '🟡 Needs Review' : '🔴 Discussion Only');
-
-        const card = document.createElement('div');
-        card.className = 'item-card';
-        card.innerHTML = `
-          <div class="item-header">
-            <h3 style="font-size: 1.05rem;">${idx + 1}. ${item.action_title || item.title}</h3>
-            <span class="badge ${badgeClass}">${badgeText}</span>
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.id = 'item-' + item.id;
+        const statusBadge = item.review_status === 'APPROVED' ? '<span class="badge b-approved">Approved</span>'
+          : item.review_status === 'REJECTED' ? '<span class="badge b-rejected">Rejected</span>' : '';
+        div.innerHTML = `
+          <div class="item-head">
+            <strong>${idx + 1}. ${escapeHtml(item.title)}</strong>
+            <div>${statusBadge}<span class="badge ${badgeClass(item.classification)}">${badgeLabel(item.classification)}</span></div>
           </div>
-          <div class="quote-box">Quote Evidence: "${item.quote_provenance || 'N/A'}"</div>
-          <div class="inline-fields">
-            <div class="field-group">
-              <label>Assignee Username</label>
-              <input type="text" id="owner-${idx}" value="${item.github_assignee_login || item.owner_name || ''}">
-            </div>
-            <div class="field-group">
-              <label>Priority</label>
-              <select id="priority-${idx}">
-                <option value="HIGH" ${item.priority === 'HIGH' ? 'selected' : ''}>HIGH</option>
-                <option value="MEDIUM" ${item.priority === 'MEDIUM' || !item.priority ? 'selected' : ''}>MEDIUM</option>
-                <option value="LOW" ${item.priority === 'LOW' ? 'selected' : ''}>LOW</option>
-              </select>
-            </div>
-            <div class="field-group">
-              <label>Due Date</label>
-              <input type="date" id="date-${idx}" value="${item.resolved_due_date || ''}">
-            </div>
+          <div class="quote">"${escapeHtml(item.quote_provenance || 'N/A')}"</div>
+          <div class="sub">Speaker: ${escapeHtml(item.speaker_name || '?')} · Confidence: ${item.confidence_score ?? '—'}</div>
+          ${item.classification === 'DISCUSSION_ONLY' ? '<div class="warn">Blocked from GitHub — discussion only</div>' : ''}
+          <div class="fields">
+            <div><label>GitHub assignee (explicit only)</label><input id="gh-${item.id}" value="${escapeHtml(item.github_assignee_login || '')}" placeholder="github-username"></div>
+            <div><label>Owner name</label><input id="owner-${item.id}" value="${escapeHtml(item.final_owner_name || item.proposed_owner_name || '')}"></div>
+            <div><label>Priority</label><select id="pri-${item.id}"><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select></div>
+            <div><label>Due date</label><input type="date" id="due-${item.id}" value="${item.due_date || ''}"></div>
           </div>
-        `;
-        list.appendChild(card);
+          <div class="actions">
+            <button class="btn btn-green btn-sm" onclick="reviewItem('${item.id}','APPROVED')">Approve</button>
+            <button class="btn btn-red btn-sm" onclick="reviewItem('${item.id}','REJECTED')">Reject</button>
+          </div>`;
+        root.appendChild(div);
+        const sel = div.querySelector('#pri-' + item.id);
+        if (item.priority) sel.value = item.priority;
       });
     }
 
-    async function dispatchAll() {
-      if (!activeMeetingId) return alert('No active meeting thread to dispatch.');
+    async function analyzeText() {
+      const text = document.getElementById('text-input').value.trim();
+      if (text.length < 50) return alert('Need at least 50 characters.');
+      const res = await fetch('/ingest', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text, meeting_date: new Date().toISOString().slice(0, 10), title: 'Pasted transcript' })
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.detail || 'Ingest failed');
+      showReview(data);
+    }
 
+    async function uploadTranscriptFile(file) {
+      if (!file) return;
+      const fd = new FormData(); fd.append('file', file);
+      const res = await fetch('/ingest/file', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) return alert(data.detail || 'File ingest failed');
+      showReview(data);
+    }
+
+    async function uploadMedia(file) {
+      if (!file) return;
+      const status = document.getElementById('media-status');
+      const bar = document.getElementById('progress-bar');
+      document.getElementById('progress-wrap').style.display = 'block';
+      status.textContent = 'Preparing upload...';
       try {
-        const res = await fetch(`/meetings/${activeMeetingId}/dispatch`, { method: 'POST' });
-        const data = await res.json();
-        renderResults(data.results || []);
-      } catch (err) {
-        alert('Dispatch error: ' + err.message);
+        const prep = await fetch('/media/uploads', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: file.name, meeting_date: new Date().toISOString().slice(0,10), filename: file.name, content_type: file.type || 'video/mp4', size_bytes: file.size })
+        });
+        const prepData = await prep.json();
+        if (!prep.ok) throw new Error(prepData.detail || 'Upload prep failed');
+
+        let ok = false;
+        try {
+          await xhrPut(prepData.upload_url, file, file.type || 'video/mp4', pct => { bar.style.width = pct + '%'; status.textContent = 'Uploading to GCS ' + pct + '%'; });
+          ok = true;
+        } catch (_) { /* fallback below */ }
+
+        let data;
+        if (ok) {
+          await fetch('/media/' + prepData.media_id + '/confirm-upload', { method: 'POST' });
+          status.textContent = 'Transcribing & extracting...';
+          const tr = await fetch('/media/' + prepData.media_id + '/transcribe', { method: 'POST' });
+          data = await tr.json();
+          if (!tr.ok) throw new Error(data.detail || 'Transcription failed');
+          data.meeting_id = prepData.meeting_id;
+        } else {
+          status.textContent = 'Fallback: uploading via backend...';
+          const fd = new FormData(); fd.append('file', file);
+          const dr = await xhrPost('/media/direct-upload', fd, pct => { bar.style.width = pct + '%'; });
+          data = JSON.parse(dr);
+        }
+        status.textContent = 'Done.';
+        showReview(data);
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
       }
     }
 
-    function renderResults(results) {
-      const container = document.getElementById('results-container');
-      const list = document.getElementById('results-list');
-      container.classList.remove('hidden');
-      list.innerHTML = '';
-
-      results.forEach(r => {
-        const box = document.createElement('div');
-        box.style.cssText = 'padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.5rem; margin-bottom: 0.5rem;';
-        box.innerHTML = `
-          <strong>${r.title || 'Action Item'}</strong>: Status <code>${r.status}</code> 
-          ${r.issue_number ? `-> GitHub Issue #${r.issue_number}` : ''} 
-          ${r.html_url ? `<a href="${r.html_url}" target="_blank" style="color: #60A5FA; margin-left: 0.5rem;">View Issue 🔗</a>` : ''}
-        `;
-        list.appendChild(box);
+    function xhrPut(url, file, type, onProgress) {
+      return new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open('PUT', url);
+        x.setRequestHeader('Content-Type', type);
+        x.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+        x.onload = () => x.status >= 200 && x.status < 300 ? resolve() : reject(new Error('GCS HTTP ' + x.status));
+        x.onerror = () => reject(new Error('GCS network error'));
+        x.send(file);
       });
+    }
+
+    function xhrPost(url, fd, onProgress) {
+      return new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open('POST', url);
+        x.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)); };
+        x.onload = () => x.status >= 200 && x.status < 300 ? resolve(x.responseText) : reject(new Error('HTTP ' + x.status));
+        x.onerror = () => reject(new Error('Network error'));
+        x.send(fd);
+      });
+    }
+
+    async function reviewItem(itemId, decision) {
+      if (!meetingId) return;
+      const body = {
+        reviewer_name: REVIEWER, decision,
+        github_assignee_login: document.getElementById('gh-' + itemId).value.trim() || null,
+        final_owner_name: document.getElementById('owner-' + itemId).value.trim() || null,
+        priority: document.getElementById('pri-' + itemId).value,
+        resolved_due_date: document.getElementById('due-' + itemId).value || null,
+      };
+      const res = await fetch(`/meetings/${meetingId}/action-items/${itemId}/review`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.detail || 'Review failed');
+      const idx = items.findIndex(i => i.id === itemId);
+      if (idx >= 0) items[idx] = data;
+      renderItems();
+    }
+
+    async function dispatchApproved() {
+      if (!meetingId) return;
+      const res = await fetch('/meetings/' + meetingId + '/dispatch', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) return alert(data.detail || 'Dispatch failed');
+      showResults(data.results || []);
+      await loadAudit();
+    }
+
+    function showResults(results) {
+      document.getElementById('results-section').classList.remove('hidden');
+      const el = document.getElementById('results-list');
+      if (!results.length) {
+        el.innerHTML = '<div class="result">No approved items to dispatch. Approve items first.</div>';
+        return;
+      }
+      el.innerHTML = results.map(r => {
+        const url = r.html_url || (r.result && r.result.issue_url) || '';
+        const dry = r.dry_run || (r.result && r.result.dry_run);
+        return `<div class="result"><strong>${escapeHtml(r.title || r.action_item_id)}</strong> — ${r.status}${dry ? ' (DRY RUN — set DRY_RUN=false for live issues)' : ''}${url ? ` <a href="${url}" target="_blank" style="color:#93c5fd">View</a>` : ''}</div>`;
+      }).join('');
+    }
+
+    async function loadAudit() {
+      const res = await fetch('/meetings/' + meetingId);
+      const data = await res.json();
+      const el = document.getElementById('audit-list');
+      const events = data.audit_events || [];
+      el.innerHTML = '<strong>Audit log (' + events.length + ' events)</strong>' + events.slice(-8).reverse().map(e =>
+        `<div class="result" style="margin-top:.4rem"><code>${e.event_type}</code> · ${e.actor_type}${e.actor_name ? ' (' + e.actor_name + ')' : ''}</div>`
+      ).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
   </script>
 </body>
