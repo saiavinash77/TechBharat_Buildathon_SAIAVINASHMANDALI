@@ -195,6 +195,16 @@
       text-align: center;
     }
 
+    .callout {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: #BFDBFE;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+
     .item-card {
       background: rgba(15, 23, 42, 0.7);
       border: 1px solid var(--glass-border);
@@ -410,9 +420,9 @@
 
     <!-- Review Container -->
     <div id="review-container" class="card hidden">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
         <h2>📋 Candidate Action Items</h2>
-        <button class="btn btn-green" onclick="dispatchAll()">🚀 Approve & Dispatch to GitHub</button>
+        <button id="dispatch-button" class="btn btn-green" onclick="dispatchAll()">🚀 Approve & Dispatch to GitHub</button>
       </div>
       <div id="executive-summary" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent-blue); border-radius: 0.5rem;"></div>
       <div id="candidate-list"></div>
@@ -709,6 +719,21 @@
 
       const items = (payload && payload.items) ? payload.items : (payload && payload.action_items ? payload.action_items : []);
       currentCandidates = items;
+      const dispatchButton = document.getElementById('dispatch-button');
+      if (dispatchButton) {
+        dispatchButton.disabled = !items.length;
+        dispatchButton.style.opacity = items.length ? '1' : '0.55';
+      }
+
+      if (!items.length) {
+        list.innerHTML = `
+          <div class="callout">
+            <strong>No reviewable action items detected yet.</strong>
+            <p>Please try a clearer recording, paste your transcript, or verify that the transcription is complete before dispatching.</p>
+          </div>
+        `;
+        return;
+      }
 
       items.forEach((item, idx) => {
         const badgeClass = item.classification === 'EXPLICIT_COMMITMENT' ? 'badge-commitment' : (item.classification === 'NEEDS_CONFIRMATION' ? 'badge-needs' : 'badge-discussion');
@@ -747,13 +772,17 @@
 
     async function dispatchAll() {
       if (!activeMeetingId) return alert('No active meeting thread to dispatch.');
+      if (!currentCandidates || !currentCandidates.length) return alert('No candidate action items available to dispatch.');
 
       try {
         const res = await fetch(`/meetings/${activeMeetingId}/dispatch`, { method: 'POST' });
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
         const data = await res.json();
         renderResults(data.results || []);
       } catch (err) {
-        alert('Dispatch error: ' + err.message);
+        alert('Dispatch error: ' + (err.message || err));
       }
     }
 
