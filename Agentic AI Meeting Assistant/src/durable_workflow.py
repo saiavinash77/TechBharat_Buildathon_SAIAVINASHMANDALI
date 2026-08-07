@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any
+import re
 
 from src.insforge_client import InsForgeRepository
 from src.nodes.execute import execute_node
@@ -70,14 +71,73 @@ def _review_view(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_title(title: str) -> str:
+    """Normalize title for deduplication by removing extra spaces, lowercasing, and removing common words."""
+    # Remove extra whitespace and convert to lowercase
+    normalized = re.sub(r'\s+', ' ', title.strip().lower())
+    # Remove common words that don't affect meaning
+    common_words = {'the', 'a', 'an', 'and', 'or', 'to', 'for', 'with', 'by', 'on', 'in', 'at'}
+    words = [word for word in normalized.split() if word not in common_words]
+    return ' '.join(words)
+
+def _are_duplicates(item1: ActionItem, item2: ActionItem) -> bool:
+    """Check if two action items are duplicates based on title similarity."""
+    title1_norm = _normalize_title(item1.action_title)
+    title2_norm = _normalize_title(item2.action_title)
+    
+    # Exact match after normalization
+    if title1_norm == title2_norm:
+        return True
+    
+    # Check for high similarity (80% match)
+    if len(title1_norm) > 5 and len(title2_norm) > 5:
+        # Simple Jaccard similarity
+        set1 = set(title1_norm.split())
+        set2 = set(title2_norm.split())
+        intersection = len(set1.intersection(set2))
+        union = len(set1.union(set2))
+        similarity = intersection / union if union > 0 else 0
+        if similarity >= 0.8:
+            return True
+    
+    return False
+
+def _deduplicate_candidates(candidates: list[ActionItem]) -> list[ActionItem]:
+    """Remove duplicate action items based on title similarity."""
+    if not candidates:
+        return []
+    
+    deduplicated = []
+    seen_titles = []
+    
+    for candidate in candidates:
+        is_duplicate = False
+        normalized_title = _normalize_title(candidate.action_title)
+        
+        for seen_title in seen_titles:
+            if normalized_title == seen_title:
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            deduplicated.append(candidate)
+            seen_titles.append(normalized_title)
+    
+    return deduplicated
+
 def persist_candidates(repository: InsForgeRepository, meeting_id: str, thread_id: str, candidates: list[ActionItem]) -> list[dict[str, Any]]:
     """Save one immutable AI proposal per candidate before a reviewer can act."""
     existing = repository.list("action_items", {"meeting_id": f"eq.{meeting_id}"}, order="created_at.asc")
     if existing:
         return [_review_view(item) for item in existing]
 
+    # Deduplicate candidates before persisting
+    deduplicated = _deduplicate_candidates(candidates)
+    original_count = len(candidates)
+    dedup_count = len(deduplicated)
+    
     stored = []
-    for candidate in candidates:
+    for candidate in deduplicated:
         stored.append(repository.insert("action_items", {"meeting_id": meeting_id, **_candidate_payload(candidate)}))
 
     run = repository.find_one("workflow_runs", {"meeting_id": f"eq.{meeting_id}"})
@@ -95,7 +155,12 @@ def persist_candidates(repository: InsForgeRepository, meeting_id: str, thread_i
         "meeting_id": meeting_id,
         "event_type": "EXTRACTION_COMPLETED",
         "actor_type": "SYSTEM",
-        "payload": {"candidate_count": len(stored), "thread_id": thread_id},
+        "payload": {
+            "candidate_count": len(stored),
+            "original_count": original_count,
+            "deduplicated_count": original_count - dedup_count,
+            "thread_id": thread_id
+        },
     })
     return [_review_view(item) for item in stored]
 

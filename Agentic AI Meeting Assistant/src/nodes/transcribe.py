@@ -55,7 +55,7 @@ def _normalise_result(response: Any) -> TranscriptionResult:
 
 def _transcribe(**source: Any) -> TranscriptionResult:
     response = _get_groq_client().audio.transcriptions.create(
-        model=os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo"),
+        model=os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3"),
         response_format="verbose_json",
         timestamp_granularities=["segment", "word"],
         temperature=0,

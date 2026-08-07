@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
 from google.cloud import storage
+from google.api_core import exceptions as gcs_exceptions
 
 
 class MediaConfigurationError(RuntimeError):
@@ -127,9 +129,31 @@ class GCSMediaStore:
         blob.upload_from_filename(file_path, content_type=content_type)
 
     def upload_bytes(self, object_key: str, content: bytes, content_type: str) -> None:
-        """Upload binary bytes directly to private GCS storage using official SDK."""
+        """Upload binary bytes directly to private GCS storage using official SDK with retry logic."""
         blob = self.bucket.blob(object_key)
-        blob.upload_from_string(content, content_type=content_type)
+        
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                blob.upload_from_string(
+                    content, 
+                    content_type=content_type,
+                    timeout=300  # 5 minutes timeout for large files
+                )
+                return
+            except (gcs_exceptions.GoogleAPIError, gcs_exceptions.GoogleConnectionError) as e:
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))  # Exponential backoff
+                    continue
+                raise MediaConfigurationError(f"GCS upload failed after {max_retries} attempts: {str(e)}") from e
+            except Exception as e:
+                if "SSL" in str(e) or "timeout" in str(e).lower():
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay * (2 ** attempt))
+                        continue
+                raise
 
     def download_bytes(self, object_key: str) -> bytes:
         """Download binary bytes directly from private GCS storage using official SDK."""

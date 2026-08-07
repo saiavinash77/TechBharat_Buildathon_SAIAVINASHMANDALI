@@ -1,9 +1,11 @@
 # Demo script — 5 minutes (Use Case B)
 
 ## Before demo
-1. `DRY_RUN=false` in `.env` with sandbox `GITHUB_TOKEN` + `GITHUB_REPO`
-2. `uvicorn main:app --reload` then open **http://localhost:8000/ui**
-3. Have `data/sample_transcript.txt` ready as backup
+1. Follow **DEMO_SETUP.md** — set `DRY_RUN=false`, `GITHUB_TOKEN`, `GITHUB_REPO`
+2. Run `python verify_demo.py` until all required checks pass
+3. `uvicorn main:app --reload` then open **http://localhost:8000/ui**
+4. Issues proof URL: https://github.com/saiavinash77/TechBharat_Buildathon_SAIAVINASHMANDALI/issues
+5. Have `data/sample_transcript.txt` ready as backup
 
 ## Narrative (follow in order)
 
