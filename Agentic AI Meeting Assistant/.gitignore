@@ -39,3 +39,4 @@ frontend/out/
 frontend/.env.local
 frontend/.env.production
 frontend/.env.development
+frontend/.next/
